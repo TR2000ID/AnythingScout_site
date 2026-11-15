@@ -1,0 +1,10 @@
+# Cloudflare Worker: Anime Scout's site + its one small server address, /api/watch (where to watch in Japan).
+# The TMDB key is NOT here: locally it's in .dev.vars, online it's a Cloudflare secret (TMDB_KEY).
+name = "anime-scout"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# The site (built by `npm run build` in web/) is served from here, free. Anything that isn't a file,
+# like /api/watch, goes to src/index.ts.
+[assets]
+directory = "../web/dist"

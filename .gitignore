@@ -1,0 +1,22 @@
+# Installed packages and build output
+node_modules/
+web/dist/
+*.tsbuildinfo
+
+# The Worker: its local secrets and wrangler's cache
+.dev.vars
+worker/.dev.vars
+.wrangler/
+
+# Python (browser checks)
+__pycache__/
+*.pyc
+
+# Plan-execution scratch (superpowers)
+.superpowers/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
