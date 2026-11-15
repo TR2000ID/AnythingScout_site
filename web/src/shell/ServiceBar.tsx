@@ -1,0 +1,32 @@
+// The bar across the top of every page: the site's name, then one tab per section (Games · Anime · Manga & Comics).
+// Sections that aren't here yet carry a small "Soon" pill. The language is Anime's setting for now
+// (step 3 of the merge makes settings shared across the site).
+import { useSettings } from "../anime/state/settings";
+import { READY, SECTIONS, useRoute } from "./route";
+import { SHELL_TEXTS, SITE_NAME } from "./texts";
+
+export function ServiceBar() {
+  const t = SHELL_TEXTS[useSettings().lang];
+  const current = useRoute()?.section;
+
+  return (
+    <header className="service-bar">
+      <a className="service-brand" href="/">
+        {SITE_NAME}
+      </a>
+      <nav className="service-tabs" aria-label={t.sections}>
+        {SECTIONS.map((section) => (
+          <a
+            key={section}
+            className="service-tab"
+            href={`/${section}/`}
+            aria-current={section === current ? "page" : undefined}
+          >
+            <span className="service-name">{t[section]}</span>
+            {!READY.includes(section) && <span className="service-soon">{t.soon}</span>}
+          </a>
+        ))}
+      </nav>
+    </header>
+  );
+}
