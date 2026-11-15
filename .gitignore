@@ -20,3 +20,11 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Games: update_steam.py's daily output (dated copies + latest.json, which points at them). Git keeps the
+# plain-named starting copy (games.json...) instead, so the repo doesn't grow every day
+web/public/data/games/steam/*.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9].*
+web/public/data/games/steam/latest.json
+web/public/data/games/**/*.tmp
+# One-time copy of Game Scout ratings (tools/read_game_ratings.py): personal, never committed
+web/.carry/

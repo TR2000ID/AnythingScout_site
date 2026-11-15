@@ -1,0 +1,69 @@
+{
+  "steam": {
+    "games": 18313,
+    "tags": 438,
+    "tag_weights": 322506,
+    "neighbor_rows": 11593,
+    "neighbors_per_game": 100,
+    "images": "https://shared.akamai.steamstatic.com/store_item_assets/",
+    "flags": {
+      "mac": 1,
+      "linux": 2,
+      "japanese": 4,
+      "is_new": 8
+    },
+    "model": "ease",
+    "players_data_until": "2023-10-24",
+    "updated": "2026-11-04T19:06+00:00",
+    "prices": [
+      "us",
+      "jp"
+    ]
+  },
+  "playstation": {
+    "games": 11041,
+    "tags": 0,
+    "tag_weights": 0,
+    "neighbor_rows": 11041,
+    "neighbors_per_game": 100,
+    "images": "",
+    "flags": {
+      "japanese": 4,
+      "rate_only": 16,
+      "backcompat": 32
+    },
+    "modes": [
+      "players"
+    ],
+    "languages_partial": true,
+    "players": 46582,
+    "history_players": 5000,
+    "signal": "mix",
+    "model": "ease",
+    "players_data_until": "2024-12-29",
+    "updated": "2026-10-07T12:24+00:00"
+  },
+  "xbox": {
+    "games": 9061,
+    "tags": 0,
+    "tag_weights": 0,
+    "neighbor_rows": 9061,
+    "neighbors_per_game": 100,
+    "images": "",
+    "flags": {
+      "japanese": 4,
+      "rate_only": 16,
+      "backcompat": 32
+    },
+    "modes": [
+      "players"
+    ],
+    "languages_partial": true,
+    "players": 46463,
+    "history_players": 4984,
+    "signal": "mix",
+    "model": "ease",
+    "players_data_until": "2024-12-24",
+    "updated": "2026-10-07T12:25+00:00"
+  }
+}
