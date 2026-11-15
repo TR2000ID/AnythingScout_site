@@ -7,8 +7,8 @@ export type Section = "games" | "anime" | "manga";
 /** Top bar order (your call): Games · Anime · Manga & Comics */
 export const SECTIONS: Section[] = ["games", "anime", "manga"];
 
-/** Sections that have moved in; the rest show "Soon". Step 2 of the merge adds "games" (then Games opens first). */
-export const READY: Section[] = ["anime"];
+/** Sections that have moved in; the rest show "Soon". */
+export const READY: Section[] = ["games", "anime"];
 
 /** The last section used, so opening the site lands you back there */
 export const SECTION_KEY = "anything-scout.section";

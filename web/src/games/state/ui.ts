@@ -3,9 +3,11 @@ import { useSyncExternalStore } from "react";
 import { createStore, useStore } from "./createStore";
 import type { Reason } from "../lib/recommend";
 import type { PlatformId } from "../platforms";
+import { navigate, routeStore } from "../../shell/route";
 
 // ---------- pages ----------
-// The page lives in the link after #, so Back/Forward and bookmarks work: …/#/liked
+// The page lives in the address, so Back/Forward and bookmarks work: …/games/liked
+// (shell/route.ts reads the address)
 export type Page = "for-you" | "sales" | "liked" | "okay" | "disliked" | "hidden" | "settings" | "about";
 const PAGES: Page[] = ["for-you", "sales", "liked", "okay", "disliked", "hidden", "settings", "about"];
 
@@ -13,15 +15,17 @@ const PAGES: Page[] = ["for-you", "sales", "liked", "okay", "disliked", "hidden"
 export const MY_GAMES = ["liked", "okay", "disliked", "hidden"] as const;
 export type MyGamesList = (typeof MY_GAMES)[number];
 
-function pageFromHash(): Page {
-  const name = location.hash.replace(/^#\/?/, "");
-  return PAGES.includes(name as Page) ? (name as Page) : "for-you";
+/** "sales" -> "sales"; "" or an unknown page -> For you */
+export function pageFromPath(page: string): Page {
+  return PAGES.includes(page as Page) ? (page as Page) : "for-you";
 }
 
-const pageStore = createStore<Page>(pageFromHash());
-window.addEventListener("hashchange", () => {
-  pageStore.set(pageFromHash());
-  window.scrollTo(0, 0);
+// Follows the address while it's in Games; on another section it keeps the last Games page
+const start = routeStore.get();
+const pageStore = createStore<Page>(pageFromPath(start?.section === "games" ? start.page : ""));
+routeStore.subscribe(() => {
+  const route = routeStore.get();
+  if (route?.section === "games") pageStore.set(pageFromPath(route.page));
 });
 
 export function usePage() {
@@ -29,7 +33,7 @@ export function usePage() {
 }
 
 export function hrefOf(page: Page) {
-  return page === "for-you" ? "#/" : `#/${page}`;
+  return page === "for-you" ? "/games/" : `/games/${page}`;
 }
 
 /** The sidebar's choices change For you and Steam sales. Picking one from any other page takes you to For you
@@ -37,7 +41,7 @@ export function hrefOf(page: Page) {
 export function showPicks(platform?: PlatformId) {
   const page = pageStore.get();
   if (page === "for-you" || (page === "sales" && (!platform || platform === "steam"))) return;
-  location.hash = hrefOf("for-you");
+  navigate(hrefOf("for-you"));
 }
 
 // ---------- phones ----------

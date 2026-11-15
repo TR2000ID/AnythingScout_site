@@ -1,13 +1,12 @@
-// What a section shows before it has moved in.
-import { useSettings } from "../anime/state/settings";
+// What a section shows before it has moved in (only Manga & Comics now).
 import { SHELL_TEXTS } from "./texts";
 
-export function Soon({ section }: { section: "games" | "manga" }) {
-  const t = SHELL_TEXTS[useSettings().lang];
+export function Soon({ lang }: { lang: "en" | "ja" }) {
+  const t = SHELL_TEXTS[lang];
   return (
     <main className="soon-page">
-      <h1>{section === "games" ? t.soonGamesTitle : t.soonMangaTitle}</h1>
-      <p>{section === "games" ? t.soonGames : t.soonManga}</p>
+      <h1>{t.soonMangaTitle}</h1>
+      <p>{t.soonManga}</p>
     </main>
   );
 }

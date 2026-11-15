@@ -1,12 +1,11 @@
 // The bar across the top of every page: the site's name, then one tab per section (Games · Anime · Manga & Comics).
-// Sections that aren't here yet carry a small "Soon" pill. The language is Anime's setting for now
-// (step 3 of the merge makes settings shared across the site).
-import { useSettings } from "../anime/state/settings";
+// Sections that aren't here yet carry a small "Soon" pill. The language is the section's own setting for now
+// (Shell picks it, see barLang in sections.ts; step 3 of the merge makes settings shared across the site).
 import { READY, SECTIONS, useRoute } from "./route";
 import { SHELL_TEXTS, SITE_NAME } from "./texts";
 
-export function ServiceBar() {
-  const t = SHELL_TEXTS[useSettings().lang];
+export function ServiceBar({ lang }: { lang: "en" | "ja" }) {
+  const t = SHELL_TEXTS[lang];
   const current = useRoute()?.section;
 
   return (
