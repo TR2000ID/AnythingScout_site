@@ -45,6 +45,32 @@ def stamp(commit, latest):
     return f"{commit} {latest.get('updated')} {json.dumps(latest.get('files', {}), sort_keys=True)}"
 
 
+def base_mismatch(main_games, live_games):
+    """Base files that differ between this checkout's Games data and the live copy's (paths like "steam/nbr_idx.u16").
+    update_steam.py builds today's files on top of THIS checkout's base (the player links point at games by
+    position), so if the live version's base differs, today's files don't belong with it."""
+    def base(root):
+        files = {"platforms.json": root / "platforms.json"}
+        steam = root / "steam"
+        if steam.is_dir():
+            files.update({f"steam/{p.name}": p for p in steam.iterdir() if p.is_file() and not DAILY.match(p.name)})
+        return files
+    mine, theirs = base(main_games), base(live_games)
+    return sorted(name for name in mine.keys() | theirs.keys()
+                  if name not in mine or name not in theirs or mine[name].read_bytes() != theirs[name].read_bytes())
+
+
+def setup_output(log):
+    """Where the messages go. pythonw (the Windows task) has no console at all (sys.stdout is None), so with a
+    log everything goes there, opened before anything else can fail."""
+    if log:
+        log.parent.mkdir(parents=True, exist_ok=True)
+        mode = "w" if log.exists() and log.stat().st_size > 1_000_000 else "a"
+        sys.stdout = sys.stderr = open(log, mode, encoding="utf-8", buffering=1)
+    elif sys.stdout is not None:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # wrangler prints emoji; this PC's console is cp932
+
+
 def plan(live, install):
     """The npm commands, in order: install where the lock file changed, then the approved deploy command."""
     npm = shutil.which("npm") or "npm"
@@ -91,12 +117,7 @@ def lock_changes(state):
 
 def main():
     dry = "--dry-run" in sys.argv
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # wrangler prints emoji; this PC's console is cp932
-    STATE.mkdir(exist_ok=True)
-    if "--log" in sys.argv:
-        log = STATE / "deploy.log"
-        mode = "w" if log.exists() and log.stat().st_size > 1_000_000 else "a"
-        sys.stdout = sys.stderr = open(log, mode, encoding="utf-8", buffering=1)
+    setup_output(STATE / "deploy.log" if "--log" in sys.argv else None)
     print(f"\n===== {datetime.now():%Y-%m-%d %H:%M} =====", flush=True)
 
     latest = json.loads((REPO / STEAM / "latest.json").read_text(encoding="utf-8"))
@@ -109,6 +130,14 @@ def main():
         return
 
     refresh_copy(dry)
+    if (LIVE_COPY / STEAM).parent.is_dir():
+        changed = base_mismatch(REPO / STEAM.parent, LIVE_COPY / STEAM.parent)
+        if changed:
+            raise SystemExit(f"Games base data changed since the live version ({', '.join(changed[:4])}): today's Steam "
+                             "files are built on the new base, so they can't go out with the old one. Move the live "
+                             "tag (with your OK) first. The site keeps its last version.")
+    elif not dry:
+        raise SystemExit(f"The live version ({commit[:7]}) has no Games data: move the live tag first.")
     steam = LIVE_COPY / STEAM
     names = fresh_files(latest)
     if dry:

@@ -38,6 +38,17 @@ def saved(page):
     return page.evaluate("[localStorage.getItem('game-scout.ratings'), localStorage.getItem('game-scout.settings')]")
 
 
+def rate_here(page, title):
+    """Rate a game from the sidebar search, staying on the page (what someone might do right after copying)."""
+    page.locator("#search-input").fill(title)
+    page.wait_for_selector(".search-row")
+    page.locator(".search-row").first.click()
+    page.wait_for_selector(".dialog")
+    page.locator(".dialog .tier-buttons button", has_text="Liked").first.click()
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(400)
+
+
 blank = lambda route: route.fulfill(status=200, content_type="text/html", body="<!doctype html>")
 
 with tempfile.TemporaryDirectory(prefix="carry-profile-") as profile_dir, sync_playwright() as p:
@@ -102,6 +113,12 @@ with tempfile.TemporaryDirectory(prefix="carry-profile-") as profile_dir, sync_p
     check("saved exactly as they were", saved(pg) == [RATINGS, SETTINGS])
     check("the data is gone from the address", "#" not in pg.url, pg.url[:80])
     pg.screenshot(path=scratch / "carry-done.png")
+    rate_here(pg, "Half-Life 2")
+    after = json.loads(saved(pg)[0])["rows"]
+    check("rating another game in the same tab keeps the copied ones", len(after) == 4 and
+          all(r in after for r in ROWS), f"{len(after)} saved")
+    pg.evaluate("r => localStorage.setItem('game-scout.ratings', r)", RATINGS)
+    pg.goto(SITE + "/games/carry?copied=3")  # a fresh load (as after a copy), so the site reads them again
     pg.get_by_role("link", name="Open My games").click()
     pg.wait_for_url("**/games/liked")
     pg.wait_for_selector("article.card", timeout=60000)
@@ -115,7 +132,12 @@ with tempfile.TemporaryDirectory(prefix="carry-profile-") as profile_dir, sync_p
     check("different ratings: asks first, overwrites nothing", saved(pg)[0] == other and "1 different" in pg.locator("main").inner_text())
     pg.screenshot(path=scratch / "carry-ask.png")
     pg.get_by_role("button", name="Replace").click()
+    pg.wait_for_selector("text=Copied 3 ratings")
     check("Replace writes them exactly", saved(pg) == [RATINGS, SETTINGS])
+    rate_here(pg, "Half-Life 2")
+    after = json.loads(saved(pg)[0])["rows"]
+    check("...and rating after Replace keeps them too", len(after) == 4 and all(r in after for r in ROWS), f"{len(after)} saved")
+    pg.evaluate("r => localStorage.setItem('game-scout.ratings', r)", RATINGS)
     pg.goto(link)
     check("opening the link again: already here", "already here" in pg.locator("main").inner_text())
     pg.goto(SITE + "/games/carry")

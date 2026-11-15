@@ -32,21 +32,37 @@ function write(data: CarryData): boolean {
 // Read once when the page opens, then take the data out of the address so it doesn't sit in the history.
 // Kept, because React may run a state's first value twice (StrictMode): the second run must not find an
 // empty address and report "no ratings".
-let arrived: { data: CarryData | null; outcome: Outcome } | null = null;
+interface Arrived {
+  data: CarryData | null;
+  outcome: Outcome;
+  copied?: number; // after the reload that follows a copy: how many arrived
+}
+let arrived: Arrived | null = null;
 const arriveOnce = () => (arrived ??= arrive());
 
-function arrive(): { data: CarryData | null; outcome: Outcome } {
+/** The site's ratings and settings were read into memory when it loaded, before this page wrote new ones.
+ *  Load the page again (as /games/carry?copied=N) so everything reads the copied ones: otherwise the next
+ *  rating made in this tab would save the old in-memory list over them. */
+function reloadWith(data: CarryData): Outcome {
+  if (!write(data)) return "failed";
+  location.replace(`${hrefOf("carry")}?copied=${countRatings(data.ratings)}`);
+  return "done";
+}
+
+function arrive(): Arrived {
+  const copied = new URLSearchParams(location.search).get("copied");
+  if (!location.hash && copied !== null) return { data: null, outcome: "done", copied: Number(copied) || 0 };
   const data = decodeCarry(location.hash);
   if (location.hash) history.replaceState(null, "", location.pathname + location.search);
   if (!data) return { data, outcome: "none" };
   const plan = planCarry(data, read(RATINGS));
-  if (plan === "write") return { data, outcome: write(data) ? "done" : "failed" };
+  if (plan === "write") return { data, outcome: reloadWith(data) };
   return { data, outcome: plan };
 }
 
 export function Carry() {
   const t = useTexts();
-  const [{ data, outcome }, setState] = useState(arriveOnce);
+  const [{ data, outcome, copied }, setState] = useState<Arrived>(arriveOnce);
   // A link opened in a tab that's already on this page only changes the part after #: read it again
   useEffect(() => {
     const again = () => {
@@ -57,7 +73,7 @@ export function Carry() {
     window.addEventListener("hashchange", again);
     return () => window.removeEventListener("hashchange", again);
   }, []);
-  const incoming = countRatings(data?.ratings ?? null);
+  const incoming = data ? countRatings(data.ratings) : (copied ?? 0);
 
   return (
     <section className="prose-page prose">
@@ -70,7 +86,7 @@ export function Carry() {
         <>
           <p>{t.carry.ask(countRatings(read(RATINGS)), incoming)}</p>
           <div className="section-actions">
-            <button className="button" onClick={() => setState({ data, outcome: write(data) ? "done" : "failed" })}>
+            <button className="button" onClick={() => setState({ data, outcome: reloadWith(data) })}>
               {t.carry.replace}
             </button>
             <button className="button" onClick={() => setState({ data, outcome: "kept" })}>
