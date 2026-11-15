@@ -4,7 +4,12 @@ One website for game, anime and (later) manga recommendations: a service switch 
 (**Games · Anime · Manga & Comics**), each section with its own pages.
 "Anything Scout" is only the repo name; the site's public name isn't picked yet.
 
-The data work stays in its own repos: Anime Scout's `export_web.py` writes into `web/public/data/anime/`.
+The data work stays in its own repos, which write into this one:
+- **Anime:** Anime Scout's `export_web.py` → `web/public/data/anime/`
+- **Games:** Game Scout's `export_web.py`, `import_steam.py` and `update_steam.py` → `web/public/data/games/`
+  (`site_files.py` there; the repos sit side by side in `C:\Users\PC_User\Projects`). The daily Steam
+  update (Windows task, 04:00) writes dated files + `steam/latest.json`, which git ignores; git keeps a
+  plain-named starting copy.
 
 ## Run it on your PC
 
@@ -13,10 +18,23 @@ cd worker && npm ci && npm run dev    # the small server (/api/watch), port 8789
 cd web && npm ci && npm run dev       # the site, http://localhost:5185/
 ```
 
+**Update now** (Games → Settings, or Steam sales) works only here on the PC: the dev server runs Game Scout's
+`update_steam.py` (~7–10 min) in the `game-scout` repo next to this one (`GAME_SCOUT_REPO=<folder>` points
+elsewhere).
+
 Tests: `npm test` in `web/` and in `worker/`. Browser checks (need both servers running, and a Python
 with Playwright: the global `python`, not Anime Scout's venv):
 `python tests\browser\shell_check.py <folder for screenshots>`
-(also `site_check`, `import_check`, `together_check`, `watch_check`, `calendar_check`).
+(also `games_check`, `carry_check`, `site_check`, `import_check`, `together_check`, `watch_check`,
+`calendar_check`; `update_check` runs a real ~10-minute Steam update).
+
+## Your Game Scout ratings (one-time copy)
+
+Game Scout ran at `localhost:5181`, and browsers keep each address's saved data apart.
+`python tools\read_game_ratings.py` reads them from a copy of your browser data (Firefox or Edge; nothing is
+changed) and prints a link per site: `/games/carry#<your ratings>`. Opening it writes them in exactly, and
+asks before replacing different ratings. `--open dev` / `--open live` opens the link; `--compare` checks it
+worked. Done 2026-11-15: 83 ratings from Firefox.
 
 ## Live site, and deploying
 
