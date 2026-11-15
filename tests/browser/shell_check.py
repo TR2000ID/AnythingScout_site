@@ -40,24 +40,21 @@ with sync_playwright() as p:
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))
 
-    # First visit, nothing saved: Anime is the only ready section, so "/" opens it
+    # First visit, nothing saved: Games, the first tab
     pg.goto(SITE + "/")
     pg.evaluate("localStorage.clear()")
     pg.goto(SITE + "/")
     pg.wait_for_selector("article.card", timeout=60000)
-    check("/ with nothing saved -> /anime/", path(pg) == "/anime/", path(pg))
+    check("/ with nothing saved -> /games/", path(pg) == "/games/", path(pg))
     check("service bar: Games, Anime, Manga & Comics in that order",
           pg.locator(".service-bar").count() == 1 and tab_names(pg) == ["Games", "Anime", "Manga & Comics"], tab_names(pg))
-    check("Anime is the current tab", pg.locator(".service-tabs a[aria-current=page]").inner_text().startswith("Anime"))
-    pg.screenshot(path=shots / "shell-1-anime.png")
+    check("Games is the current tab", pg.locator(".service-tabs a[aria-current=page]").inner_text().startswith("Games"))
+    check("only Manga & Comics says Soon", pg.locator(".service-soon").count() == 1 and
+          "Manga" in pg.locator(".service-tab", has=pg.locator(".service-soon")).inner_text())
+    pg.screenshot(path=shots / "shell-1-games.png")
 
     # Tabs
     pg.evaluate("window.__noReload = 1")
-    pg.locator(".service-tabs a", has_text="Games").click()
-    pg.wait_for_timeout(300)
-    body = pg.locator("body").inner_text()
-    check("Games tab -> /games/ with the Soon text", path(pg) == "/games/" and "moving in next" in body, path(pg))
-    pg.screenshot(path=shots / "shell-2-games-soon.png")
     pg.locator(".service-tabs a", has_text="Anime").click()
     pg.wait_for_selector("article.card")
     check("Anime tab -> back with cards", path(pg) == "/anime/" and pg.locator("article.card").count() > 0, path(pg))
@@ -65,6 +62,11 @@ with sync_playwright() as p:
     pg.wait_for_timeout(300)
     check("Manga & Comics tab -> /manga/ with the Soon text",
           path(pg) == "/manga/" and "Manga & Comics is coming" in pg.locator("body").inner_text(), path(pg))
+    pg.locator(".service-tabs a", has_text="Games").click()
+    pg.wait_for_selector("article.card")
+    main_text = pg.locator("main").inner_text()
+    check("Games tab -> Games with cards, not a Soon page",
+          path(pg) == "/games/" and ("Recommended" in main_text or "Start with games" in main_text) and "is coming" not in main_text, path(pg))
     check("switching tabs didn't reload the page", pg.evaluate("window.__noReload") == 1)
 
     # Old Anime Scout links
@@ -80,7 +82,7 @@ with sync_playwright() as p:
     pg.wait_for_timeout(300)
     pg.goto(SITE + "/")
     pg.wait_for_timeout(500)
-    check("after /manga/ (not ready), / -> /anime/", path(pg) == "/anime/", path(pg))
+    check("after /manga/ (not ready) and no Anime ratings, / -> /games/", path(pg) == "/games/", path(pg))
     pg.goto(SITE + "/anime/liked")
     pg.wait_for_timeout(300)
     pg.goto(SITE + "/")
@@ -123,6 +125,49 @@ with sync_playwright() as p:
     pg.screenshot(path=shots / "shell-3-ja.png")
     pg.evaluate("localStorage.removeItem('anime-scout.settings')")
     check("no page errors", not errors, errors[:2])
+
+    # Each section downloads only its own data
+    for start, other in [("/games/", "/data/anime/"), ("/anime/", "/data/games/")]:
+        fresh = b.new_page(viewport={"width": 1366, "height": 900}, locale="en-US")
+        asked = []
+        fresh.on("request", lambda r: asked.append(r.url))
+        fresh.goto(SITE + start)
+        fresh.wait_for_selector("article.card", timeout=60000)
+        fresh.wait_for_timeout(1500)
+        stray = [u for u in asked if other in u]
+        check(f"{start} first: nothing under {other} downloaded", not stray, stray[:2])
+        fresh.close()
+
+    # Friends with Anime ratings who never chose a section land on Anime
+    pg.goto(SITE + "/anime/")
+    pg.evaluate("""localStorage.clear(); localStorage.setItem('anime-scout.ratings',
+        JSON.stringify({version: 1, rows: [{show: 'mal:5114', rating: 'liked', at: 'x'}]}))""")
+    pg.goto(SITE + "/")
+    pg.wait_for_timeout(800)
+    check("Anime ratings saved, no section yet: / -> /anime/", path(pg) == "/anime/", path(pg))
+    pg.evaluate("localStorage.clear()")
+
+    # Back across sections keeps each section's page
+    pg.goto(SITE + "/games/sales")
+    pg.wait_for_selector(".price-now", timeout=60000)
+    pg.locator(".service-tabs a", has_text="Anime").click()
+    pg.wait_for_selector("article.card", timeout=60000)
+    pg.go_back()
+    pg.wait_for_timeout(800)
+    check("/games/sales -> Anime -> Back shows Steam sales again",
+          path(pg) == "/games/sales" and pg.locator("main h1").first.inner_text() == "Steam sales", path(pg))
+
+    # The bar speaks the language of the section on screen (each section has its own setting until step 3)
+    pg.evaluate("localStorage.setItem('game-scout.settings', JSON.stringify({lang: 'ja'}))")
+    pg.goto(SITE + "/games/")
+    pg.wait_for_selector("article.card", timeout=60000)
+    ja_tabs = tab_names(pg)
+    pg.locator(".service-tabs a").nth(1).click()
+    pg.wait_for_selector("article.card", timeout=60000)
+    check("Games in 日本語, Anime in English: the bar follows the section",
+          ja_tabs == ["ゲーム", "アニメ", "マンガ・コミック"] and tab_names(pg) == ["Games", "Anime", "Manga & Comics"],
+          f"{ja_tabs} / {tab_names(pg)}")
+    pg.evaluate("localStorage.removeItem('game-scout.settings')")
 
     # Phone
     phone = b.new_page(viewport={"width": 390, "height": 844}, locale="en-US")
