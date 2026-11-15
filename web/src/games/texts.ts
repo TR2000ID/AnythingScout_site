@@ -205,6 +205,20 @@ const en = {
       `${platform}: ${players} players' libraries and ${progress}, up to ${until}.`,
     dataSoon: "Switch: coming soon.",
   },
+  // The one-time copy of Game Scout ratings (/games/carry#..., made by tools/read_game_ratings.py)
+  carry: {
+    title: "Bring your Game Scout ratings",
+    none: "This link has no ratings in it. Make a new one with tools/read_game_ratings.py.",
+    same: (n: number) => `Your ${n} ${n === 1 ? "rating is" : "ratings are"} already here.`,
+    ask: (here: number, incoming: number) =>
+      `This site already has ${here} different game ${here === 1 ? "rating" : "ratings"}. Replace with the ${incoming} from Game Scout?`,
+    replace: "Replace",
+    keep: "Keep these",
+    kept: "Nothing changed: the ratings already here stay.",
+    done: (n: number) => `Copied ${n} ${n === 1 ? "rating" : "ratings"} and your settings.`,
+    failed: "Copying didn't work (your browser may be blocking saved data). Nothing was changed.",
+    open: "Open My games",
+  },
   about: {
     title: "About Game Scout",
     intro:
@@ -431,6 +445,19 @@ const ja: Texts = {
     dataConsole: (platform, players, progress, until) =>
       `${platform}：${players}人のライブラリと${progress}（${until}まで）。`,
     dataSoon: "Switch：準備中。",
+  },
+  carry: {
+    title: "Game Scoutの評価を引き継ぐ",
+    none: "このリンクには評価が入っていません。tools/read_game_ratings.py で作り直してください。",
+    same: (n: number) => `${n}件の評価はすでにここにあります。`,
+    ask: (here: number, incoming: number) =>
+      `このサイトには別のゲーム評価が${here}件あります。Game Scoutの${incoming}件で置き換えますか？`,
+    replace: "置き換える",
+    keep: "今のままにする",
+    kept: "変更はありません。今の評価はそのままです。",
+    done: (n: number) => `${n}件の評価と設定をコピーしました。`,
+    failed: "コピーできませんでした（ブラウザが保存を止めている可能性があります）。何も変更していません。",
+    open: "マイゲームを開く",
   },
   about: {
     title: "Game Scoutについて",

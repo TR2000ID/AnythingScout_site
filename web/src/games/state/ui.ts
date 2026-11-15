@@ -8,8 +8,9 @@ import { navigate, routeStore } from "../../shell/route";
 // ---------- pages ----------
 // The page lives in the address, so Back/Forward and bookmarks work: …/games/liked
 // (shell/route.ts reads the address)
-export type Page = "for-you" | "sales" | "liked" | "okay" | "disliked" | "hidden" | "settings" | "about";
-const PAGES: Page[] = ["for-you", "sales", "liked", "okay", "disliked", "hidden", "settings", "about"];
+// "carry" isn't in the sidebar: only the one-time ratings link (lib/carry.ts) opens it
+export type Page = "for-you" | "sales" | "liked" | "okay" | "disliked" | "hidden" | "settings" | "about" | "carry";
+const PAGES: Page[] = ["for-you", "sales", "liked", "okay", "disliked", "hidden", "settings", "about", "carry"];
 
 /** The four lists on the My games page */
 export const MY_GAMES = ["liked", "okay", "disliked", "hidden"] as const;

@@ -8,6 +8,7 @@ import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
 import { Toasts } from "./components/Toasts";
 import { About } from "./pages/About";
+import { Carry } from "./pages/Carry";
 import { ForYou } from "./pages/ForYou";
 import { MyGames } from "./pages/MyGames";
 import { Sales } from "./pages/Sales";
@@ -58,6 +59,7 @@ export function App() {
           {(MY_GAMES as readonly string[]).includes(page) && <MyGames which={page as MyGamesList} />}
           {page === "settings" && <Settings />}
           {page === "about" && <About />}
+          {page === "carry" && <Carry />}
         </main>
       </div>
 
