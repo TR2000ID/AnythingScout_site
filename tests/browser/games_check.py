@@ -55,7 +55,10 @@ with sync_playwright() as p:
     pg.wait_for_timeout(500)
     check("the rating is saved under game-scout.ratings", saved_games(pg).get("steam:620") == "liked", saved_games(pg))
     pg.wait_for_selector("h1:has-text('Recommended for you')", timeout=30000)
-    check("picks appear after one like", pg.locator("article.card").count() > 5)
+    # The "players also liked" links (a few MB) may still be downloading on a slow connection: wait for them
+    t0 = pg.evaluate("performance.now()")
+    pg.wait_for_function("document.querySelectorAll('main article.card').length > 5", timeout=60000)
+    check("picks appear after one like", True, f"{(pg.evaluate('performance.now()') - t0) / 1000:.1f}s after the heading")
     pg.screenshot(path=shots / "games-1-picks.png")
     pg.locator(".sidebar a.nav-link", has_text="My games").first.click()
     pg.wait_for_timeout(500)
