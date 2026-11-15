@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  base: "./", // relative links, so the built site works from any folder
+  base: "/", // absolute links: pages live at nested addresses like /anime/liked
   // 5185 = the combined site (5173 Satisfactory planner, 5180 Steam Scout, 5181 Game Scout, 5182 Anime Scout, 5183 Nomikai Scout, 5184 Standup Notes)
   server: {
     port: 5185,

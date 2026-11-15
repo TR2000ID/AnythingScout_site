@@ -12,7 +12,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 out = Path(sys.argv[1])
 out.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/"
+URL = "http://localhost:5185/anime/"
 res = []
 NEXT = int(time.time()) + 3 * 24 * 3600
 
@@ -46,7 +46,7 @@ with sync_playwright() as p:
     pg.wait_for_selector("article.card", timeout=60000)
     rows = [{"show": k, "rating": "liked", "at": "x"} for k in ["mal:21", "mal:52991", "mal:5114"]]
     pg.evaluate(f"localStorage.clear(); localStorage.setItem('anime-scout.ratings', JSON.stringify({{version: 1, rows: {json.dumps(rows)}}}))")
-    pg.goto(URL + "?cal#/liked")
+    pg.goto(URL + "liked?cal")
     pg.wait_for_selector("article.card", timeout=60000)
     with pg.expect_download() as info:
         pg.get_by_role("button", name="New episodes calendar").click()

@@ -9,7 +9,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 here = Path(sys.argv[1])
 here.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/"
+URL = "http://localhost:5185/anime/"
 res = []
 
 
@@ -85,7 +85,7 @@ with sync_playwright() as p:
     check("picks appear", "Recommended" in pg.locator("h1").first.inner_text())
 
     for name in ["animelist.xml", "animelist.xml.gz"]:
-        pg.goto(URL + "#/liked")
+        pg.goto(URL + "liked")
         pg.get_by_role("button", name="Import your list").first.click()
         pg.wait_for_selector("input[type=file]:not([disabled])", state="attached", timeout=60000)
         pg.locator("input[type=file]").set_input_files(str(here / name))
@@ -96,7 +96,7 @@ with sync_playwright() as p:
 
     # Slow connection: the anime data arrives 3 s late. The import waits for it instead of doing nothing
     pg.route("**/data/anime/cards.json", lambda route: (pg.wait_for_timeout(3000), route.continue_()))
-    pg.goto(URL + "?slow#/liked")
+    pg.goto(URL + "liked?slow")
     pg.get_by_role("button", name="Import your list").first.click()
     check("slow data: file + AniList buttons wait, with a loading message",
           pg.locator("input[type=file]").is_disabled() and pg.get_by_role("button", name="Get my list").is_disabled()

@@ -8,3 +8,6 @@ compatibility_date = "2026-09-01"
 # like /api/watch, goes to src/index.ts.
 [assets]
 directory = "../web/dist"
+# Addresses like /anime/settings aren't files: answer them with index.html, and the site picks the page
+# from the address (opening a link directly or reloading would otherwise give a 404)
+not_found_handling = "single-page-application"

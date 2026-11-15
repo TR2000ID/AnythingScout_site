@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 shots = Path(sys.argv[1])
 shots.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/"
+URL = "http://localhost:5185/anime/"
 res = []
 
 MINE = ["mal:5114", "mal:16498", "mal:11061"]  # FMA: Brotherhood, Attack on Titan, Hunter x Hunter
@@ -38,7 +38,7 @@ with sync_playwright() as p:
     pg.wait_for_selector("article.card", timeout=60000)
     rows = [{"show": k, "rating": "liked", "at": "x"} for k in MINE]
     pg.evaluate(f"localStorage.clear(); localStorage.setItem('anime-scout.ratings', JSON.stringify({{version: 1, rows: {json.dumps(rows)}}}))")
-    pg.goto(URL + "?mine#/together")  # a real load, so the site reads the ratings just stored
+    pg.goto(URL + "together?mine")  # a real load, so the site reads the ratings just stored
     pg.wait_for_selector(".people")
     check("one person: asks for a friend", "Add at least one friend" in pg.locator("main").inner_text())
 

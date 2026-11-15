@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 shots = Path(sys.argv[1])
 shots.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/"
+URL = "http://localhost:5185/anime/"
 res = []
 
 
@@ -77,9 +77,9 @@ with sync_playwright() as p:
     pg.screenshot(path=shots / "3-dialog.png")
     pg.keyboard.press("Escape")
 
-    pg.goto(URL + "#/settings")
+    pg.goto(URL + "settings")
     pg.get_by_role("radio", name="日本語").first.click()
-    pg.goto(URL + "#/")
+    pg.goto(URL)
     pg.wait_for_timeout(1000)
     check("Japanese UI", "おすすめ" in pg.locator("body").inner_text())
     pg.screenshot(path=shots / "4-ja.png")

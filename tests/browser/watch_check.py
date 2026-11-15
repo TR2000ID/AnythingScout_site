@@ -10,7 +10,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 shots = Path(sys.argv[1])
 shots.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/"
+URL = "http://localhost:5185/anime/"
 res = []
 
 
