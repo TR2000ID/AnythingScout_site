@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8789",
-    "deploy": "npm --prefix ../web run build && wrangler deploy",
+    "deploy": "node -e \"console.error('No deploy until go-live (step 4): this Worker is named anime-scout and would replace the live Anime Scout site. See README.'); process.exit(1)\"",
+    "deploy:golive": "npm --prefix ../web run build && wrangler deploy",
     "test": "vitest run",
     "check": "tsc --noEmit"
   },
