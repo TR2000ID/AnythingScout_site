@@ -28,3 +28,6 @@ web/public/data/games/steam/latest.json
 web/public/data/games/**/*.tmp
 # One-time copy of Game Scout ratings (tools/read_game_ratings.py): personal, never committed
 web/.carry/
+
+# Daily live deploy (tools/deploy_live.py): its log and what it deployed last
+.deploy_live/

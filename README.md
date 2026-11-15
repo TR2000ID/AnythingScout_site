@@ -38,14 +38,26 @@ worked. Done 2026-11-15: 83 ratings from Firefox.
 
 ## Live site, and deploying
 
-**Live since 2026-11-15** at https://anime-scout.nomikai-scout-worker.workers.dev (Anime Scout's address, so
-friends keep their saved ratings; old `/#/...` links still work). Anime is there; Games and Manga & Comics show
-"Soon" until their steps are done. The git tag `live` marks the version that's online.
+**Live** at https://anime-scout.nomikai-scout-worker.workers.dev (Anime Scout's address, so friends keep their
+saved ratings; old `/#/...` links still work). Anime since 2026-11-15, **Games since 2026-11-15** (step 2);
+Manga & Comics says "Soon". The git tag `live` marks the version that's online.
 
 `npm run deploy` in `worker/` refuses on purpose (a test keeps it that way): it would send whatever is on main
 live, unfinished work included. With your OK: `npm run deploy:golive`, then `git tag -f live && git push -f origin live`.
 Anime Scout's own repo no longer deploys (its `npm run deploy` refuses too).
-Roll back: `npx wrangler rollback` in `worker/` (the version before the combined site: `115a54f2`).
+Roll back: `npx wrangler rollback` in `worker/` (`npx wrangler deployments list` shows the versions;
+`399fed6b` = Anime only, `115a54f2` = the old Anime Scout).
 Check the live site: set `SITE=https://anime-scout.nomikai-scout-worker.workers.dev`, then run the browser checks.
+
+### Fresh Steam prices every morning
+
+`python tools\deploy_live.py` puts the latest Steam update on the live site: it rebuilds the version tagged
+`live` (in a second copy of the repo, `..\anything-scout-live`) with today's Steam files and deploys it, so
+unfinished work never goes out. Nothing new → it does nothing. `--dry-run` shows the steps; `--log` writes to
+`.deploy_live\deploy.log`.
+
+It's meant to run right after Game Scout's 04:00 update, as a second action of the Windows task
+"Game Scout - daily Steam update" (`pythonw.exe tools\deploy_live.py --log`, starting in this folder).
+To stop it: Task Scheduler → that task → Actions → delete that line.
 
 Design: `docs/superpowers/specs/2026-11-15-merge-design.md`.
