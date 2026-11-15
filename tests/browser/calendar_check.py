@@ -2,6 +2,7 @@
 
     python tests/browser/calendar_check.py <folder for the downloaded file>
 """
+import os
 import json
 import sys
 import time
@@ -12,7 +13,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 out = Path(sys.argv[1])
 out.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/anime/"
+URL = os.environ.get("SITE", "http://localhost:5185").rstrip("/") + "/anime/"  # SITE=https://... checks the live site
 res = []
 NEXT = int(time.time()) + 3 * 24 * 3600
 

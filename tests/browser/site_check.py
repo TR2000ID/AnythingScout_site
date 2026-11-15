@@ -1,4 +1,5 @@
 """Anime Scout site check (dev server on 5185)."""
+import os
 import sys
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 shots = Path(sys.argv[1])
 shots.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/anime/"
+URL = os.environ.get("SITE", "http://localhost:5185").rstrip("/") + "/anime/"  # SITE=https://... checks the live site
 res = []
 
 

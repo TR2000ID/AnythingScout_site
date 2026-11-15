@@ -18,11 +18,16 @@ with Playwright: the global `python`, not Anime Scout's venv):
 `python tests\browser\shell_check.py <folder for screenshots>`
 (also `site_check`, `import_check`, `together_check`, `watch_check`, `calendar_check`).
 
-## Do NOT deploy yet
+## Live site, and deploying
 
-The Worker is named `anime-scout` on purpose (go-live, step 4, keeps the live Anime Scout address
-so friends keep their saved ratings). Deploying now would **replace the live Anime Scout site**, so
-`npm run deploy` in `worker/` refuses on purpose (a test keeps it that way). The real command waits as
-`npm run deploy:golive` for step 4, with your OK.
+**Live since 2026-11-15** at https://anime-scout.nomikai-scout-worker.workers.dev (Anime Scout's address, so
+friends keep their saved ratings; old `/#/...` links still work). Anime is there; Games and Manga & Comics show
+"Soon" until their steps are done. The git tag `live` marks the version that's online.
+
+`npm run deploy` in `worker/` refuses on purpose (a test keeps it that way): it would send whatever is on main
+live, unfinished work included. With your OK: `npm run deploy:golive`, then `git tag -f live && git push -f origin live`.
+Anime Scout's own repo no longer deploys (its `npm run deploy` refuses too).
+Roll back: `npx wrangler rollback` in `worker/` (the version before the combined site: `115a54f2`).
+Check the live site: set `SITE=https://anime-scout.nomikai-scout-worker.workers.dev`, then run the browser checks.
 
 Design: `docs/superpowers/specs/2026-11-15-merge-design.md`.

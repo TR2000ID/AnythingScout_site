@@ -2,6 +2,7 @@
 
     python tests/browser/watch_check.py <folder for screenshots>
 """
+import os
 import sys
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 shots = Path(sys.argv[1])
 shots.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/anime/"
+URL = os.environ.get("SITE", "http://localhost:5185").rstrip("/") + "/anime/"  # SITE=https://... checks the live site
 res = []
 
 
@@ -24,7 +25,9 @@ def open_show(page, query):
     page.wait_for_selector(".search-row")
     page.locator(".search-row").first.click()
     page.wait_for_selector(".dialog")
-    page.wait_for_timeout(1200)
+    # Wait for the box itself, then for its "Loading…" to finish (the live site takes a few seconds)
+    page.wait_for_selector(".dialog h3:has-text('Where to watch')", timeout=30000)
+    page.wait_for_function("!document.querySelector('.dialog').innerText.includes('Loading…')", timeout=30000)
     return page.locator(".dialog").inner_text()
 
 

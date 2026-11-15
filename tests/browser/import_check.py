@@ -1,4 +1,5 @@
 """Anime Scout: import your list (AniList answered by a fake, MyAnimeList from a made-up export file)."""
+import os
 import gzip
 import json
 import sys
@@ -9,7 +10,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 here = Path(sys.argv[1])
 here.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/anime/"
+URL = os.environ.get("SITE", "http://localhost:5185").rstrip("/") + "/anime/"  # SITE=https://... checks the live site
 res = []
 
 
@@ -101,7 +102,7 @@ with sync_playwright() as p:
     check("slow data: file + AniList buttons wait, with a loading message",
           pg.locator("input[type=file]").is_disabled() and pg.get_by_role("button", name="Get my list").is_disabled()
           and pg.locator(".dialog .notice").first.is_visible())
-    pg.wait_for_selector("input[type=file]:not([disabled])", state="attached", timeout=30000)
+    pg.wait_for_selector("input[type=file]:not([disabled])", state="attached", timeout=60000)
     pg.locator("input[type=file]").set_input_files(str(here / "animelist.xml"))
     pg.wait_for_selector(".import-found")
     check("slow data: the file works once the data is in", "2 new ratings" in pg.locator(".import-found").inner_text())

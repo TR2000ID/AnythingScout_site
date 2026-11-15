@@ -2,6 +2,7 @@
 
     python tests/browser/together_check.py <folder for screenshots>
 """
+import os
 import json
 import sys
 from pathlib import Path
@@ -11,7 +12,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 shots = Path(sys.argv[1])
 shots.mkdir(parents=True, exist_ok=True)
-URL = "http://localhost:5185/anime/"
+URL = os.environ.get("SITE", "http://localhost:5185").rstrip("/") + "/anime/"  # SITE=https://... checks the live site
 res = []
 
 MINE = ["mal:5114", "mal:16498", "mal:11061"]  # FMA: Brotherhood, Attack on Titan, Hunter x Hunter
@@ -44,7 +45,7 @@ with sync_playwright() as p:
 
     pg.get_by_label("Friend's AniList username").fill("aki")
     pg.get_by_role("button", name="Add friend").click()
-    pg.wait_for_selector("article.card", timeout=30000)
+    pg.wait_for_selector("article.card", timeout=60000)
     pg.wait_for_timeout(800)
     check("friend added with their ratings", "aki" in pg.locator(".people").inner_text() and "3 rated" in pg.locator(".people").inner_text())
     note = pg.locator(".card-reason").first.inner_text()
@@ -58,7 +59,7 @@ with sync_playwright() as p:
     pg.screenshot(path=shots / "together.png")
 
     pg.reload()
-    pg.wait_for_selector("article.card", timeout=30000)
+    pg.wait_for_selector("article.card", timeout=60000)
     check("friends are remembered after a reload", "aki" in pg.locator(".people").inner_text())
     pg.get_by_role("button", name="Remove aki").click()
     check("removing the friend", "Add at least one friend" in pg.locator("main").inner_text())
