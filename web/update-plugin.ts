@@ -1,15 +1,26 @@
-// The other half of the "Update now" button. It only exists while `npm run dev` runs on your PC:
-// the page asks /__update/steam, and this starts `python update_steam.py` in the repo and keeps
-// what it prints, so the page can show the progress. The built site has no Python behind it, so
-// there the button is hidden and the daily job does the update instead (GitHub, later).
+// The other half of Games' "Update now" button. It only exists while `npm run dev` runs on your PC:
+// the page asks /__update/steam, and this starts `python update_steam.py` in the game-scout repo (next to
+// this one; GAME_SCOUT_REPO=<folder> points elsewhere) and keeps what it prints, so the page can show the
+// progress. update_steam.py writes into this repo's web/public/data/games (game-scout's site_files.py).
+// The built site has no Python behind it, so there the button is hidden and the daily 04:00 task updates.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 
-const REPO = fileURLToPath(new URL("..", import.meta.url));
-// The project's own Python (it has numpy and requests), or plain `python` if there's no .venv
-const PYTHON = [".venv/Scripts/python.exe", ".venv/bin/python"].map((p) => REPO + p).find((p) => existsSync(p)) ?? "python";
+/** The game-scout repo: GAME_SCOUT_REPO if set, else the folder next to anything-scout */
+export function gameScoutRepo(env: string | undefined): string {
+  return env || fileURLToPath(new URL("../../game-scout/", import.meta.url));
+}
+
+/** The repo's own Python (it has numpy and requests), or plain `python` if there's no .venv */
+export function pythonFor(repo: string): string {
+  return [".venv/Scripts/python.exe", ".venv/bin/python"].map((p) => join(repo, p)).find((p) => existsSync(p)) ?? "python";
+}
+
+const REPO = gameScoutRepo(process.env.GAME_SCOUT_REPO);
+const PYTHON = pythonFor(REPO);
 // Which script each button runs. Consoles join when IGDB brings their new games (Phase 2).
 const JOBS: Record<string, string> = { steam: "update_steam.py" };
 const KEEP_LINES = 200;
@@ -28,6 +39,11 @@ const IDLE: UpdateRun = { running: false, started: null, finished: null, ok: nul
 
 function start(script: string): UpdateRun {
   const run: UpdateRun = { ...IDLE, running: true, started: new Date().toISOString(), lines: [] };
+  if (!existsSync(join(REPO, script))) {
+    // Without the repo there's nothing to run: say where it was looked for, instead of a Python error
+    const finished = new Date().toISOString();
+    return { ...run, running: false, ok: false, finished, lines: [`Game Scout's repo isn't at ${REPO} (set GAME_SCOUT_REPO)`] };
+  }
   let rewrite = false; // after "\r" the next text replaces the line instead of adding to it
 
   const take = (text: string) => {
@@ -68,7 +84,7 @@ function start(script: string): UpdateRun {
 export function dataUpdater(): Plugin {
   const runs = new Map<string, UpdateRun>();
   return {
-    name: "game-scout-data-updater",
+    name: "games-data-updater",
     apply: "serve", // the dev server only: never part of the built site
     configureServer(server) {
       server.middlewares.use("/__update", (req, res, next) => {
