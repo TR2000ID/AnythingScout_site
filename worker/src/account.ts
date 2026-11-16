@@ -4,9 +4,11 @@
 //   POST   /api/account/signin  {name}   → 200 {name, token}      404 unknown · 429 too_many
 //   POST   /api/account/signout (token)  → 204
 //   GET    /api/account/me      (token)  → {name, pictureAt, empty}
+//   POST   /api/account/sync    (token)  {rev, items, blocks} → {rev, items, blocks}   (sync.ts)
 // "(token)" = header Authorization: Bearer <token>. Without a valid one: 401 signed_out.
 import { HttpError, json, noContent } from "./http";
 import { normalizeName } from "./names";
+import { sync } from "./sync";
 
 export interface Env {
   DB: D1Database;
@@ -154,6 +156,11 @@ async function me(request: Request, env: Env): Promise<Response> {
   return json({ name: user.name, pictureAt: row?.picture_at ?? null, empty: !row?.used });
 }
 
+async function syncRoute(request: Request, env: Env): Promise<Response> {
+  const user = await requireUser(request, env);
+  return json(await sync(env, user, request));
+}
+
 type Handler = (request: Request, env: Env, rest: string) => Promise<Response>;
 
 /** Address (after /api/account) → method → handler */
@@ -162,6 +169,7 @@ const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
   "/signin": { POST: signin },
   "/signout": { POST: signout },
   "/me": { GET: me },
+  "/sync": { POST: syncRoute },
 };
 
 export async function handleAccount(request: Request, env: Env, url: URL): Promise<Response> {

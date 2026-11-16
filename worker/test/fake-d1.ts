@@ -29,8 +29,12 @@ class Statement {
     const r = this.db.prepare(this.sql).run(...this.args());
     return { meta: { changes: Number(r.changes) } };
   }
+  /** Inside a batch: a SELECT (or RETURNING) gives its rows, like D1's batch results */
   runNow() {
-    return this.db.prepare(this.sql).run(...this.args());
+    const stmt = this.db.prepare(this.sql);
+    if (/^\s*SELECT\b/i.test(this.sql) || /\bRETURNING\b/i.test(this.sql)) return { results: stmt.all(...this.args()) };
+    stmt.run(...this.args());
+    return { results: [] };
   }
 }
 
@@ -45,13 +49,13 @@ export function fakeD1() {
     async batch(statements: Statement[]) {
       db.exec("BEGIN");
       try {
-        for (const s of statements) s.runNow();
+        const results = statements.map((s) => s.runNow());
         db.exec("COMMIT");
+        return results;
       } catch (e) {
         db.exec("ROLLBACK");
         throw e;
       }
-      return [];
     },
     raw: db,
   };
