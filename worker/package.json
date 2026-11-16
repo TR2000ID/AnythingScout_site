@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8789",
+    "db:local": "wrangler d1 migrations apply anything-scout --local",
     "deploy": "node -e \"console.error('Deploys need your OK: this Worker serves the live site (Anime Scout address), and unfinished work would go live with it. With your OK: npm run deploy:golive (then move the live tag). See README.'); process.exit(1)\"",
     "deploy:golive": "npm --prefix ../web run build && wrangler deploy",
     "test": "vitest run",

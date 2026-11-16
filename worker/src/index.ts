@@ -1,21 +1,10 @@
 // Anime Scout server (Cloudflare Worker). The site itself (web/dist) is served by Cloudflare before this
 // runs; this only answers /api/... addresses:
-//   /api/watch   ?tmdb=tv:31911&region=JP → where to watch it in that country (TMDB, needs TMDB_KEY)
+//   /api/watch     ?tmdb=tv:31911&region=JP → where to watch it in that country (TMDB, needs TMDB_KEY)
+//   /api/account/… accounts: create, sign in, sign out, me (account.ts; the database is D1, binding DB)
+import { type Env, handleAccount } from "./account";
+import { json } from "./http";
 import { CACHE_SECONDS, watch, WatchError } from "./watch";
-
-interface Env {
-  TMDB_KEY?: string;
-}
-
-function json(body: unknown, status = 200, cacheSeconds = 0): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": cacheSeconds ? `public, max-age=${cacheSeconds}` : "no-store",
-    },
-  });
-}
 
 /** The cache's name for a question: tmdb + region only (region as watch() reads it: JP when missing) */
 export function cacheKey(url: URL): string {
@@ -26,8 +15,9 @@ export function cacheKey(url: URL): string {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    if (request.method !== "GET") return json({ error: "method", message: "GET only" }, 405);
     const url = new URL(request.url);
+    if (url.pathname === "/api/account" || url.pathname.startsWith("/api/account/")) return handleAccount(request, env, url);
+    if (request.method !== "GET") return json({ error: "method", message: "GET only" }, 405);
     // No CORS headers: the site and this server share one address, so only our own site can read answers
     if (url.pathname !== "/api/watch") return json({ error: "not_found", message: "Not found" }, 404);
 

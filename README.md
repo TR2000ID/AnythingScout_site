@@ -14,9 +14,13 @@ The data work stays in its own repos, which write into this one:
 ## Run it on your PC
 
 ```
-cd worker && npm ci && npm run dev    # the small server (/api/watch), port 8789
+cd worker && npm ci && npm run dev    # the small server (/api/watch, /api/account), port 8789
 cd web && npm ci && npm run dev       # the site, http://localhost:5185/
 ```
+
+Once, before the first `npm run dev` in `worker/` (and again after a new file in `worker/migrations/`):
+`npm run db:local`. It makes the accounts tables in wrangler's own local test database
+(`worker/.wrangler/`), so the PC site never touches the live accounts.
 
 **Update now** (Games → Settings, or Steam sales) works only here on the PC: the dev server runs Game Scout's
 `update_steam.py` (~7–10 min) in the `game-scout` repo next to this one (`GAME_SCOUT_REPO=<folder>` points
