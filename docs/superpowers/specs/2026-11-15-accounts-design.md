@@ -1,6 +1,7 @@
 # Combined Site — Accounts Design (project 2 of the combined site)
 
 > Written by Claude on 2026-11-15 from the brainstorm with you. Status: **approved 2026-11-15** ("Looks good").
+> **LIVE 2026-11-16** on https://anime-scout.nomikai-scout-worker.workers.dev (Worker version 59c3e46f, `live` tag b157f0a; rollback version 87fa3579). Live D1 database `anything-scout` (eced518a-…). Built from the plan in 8 tasks + one review-fix pass; live checks green (accounts 28/28).
 > Builds on `(C) Combined Site — Merge Design.md` (project 2 there: "Username accounts on Cloudflare D1 + profile pictures").
 
 ## Why
