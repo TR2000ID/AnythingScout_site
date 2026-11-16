@@ -94,6 +94,144 @@
   line-height: 1.6;
 }
 
+/* ---------- the account spot (right end of the bar) ---------- */
+
+.account-spot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.account-signin {
+  white-space: nowrap;
+}
+
+.account-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 8px 0 4px;
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.account-trigger:hover,
+.account-trigger[data-state="open"] {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.account-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.account-menu {
+  max-width: 280px;
+}
+
+.account-menu .menu-item-plain {
+  padding-left: 0; /* no check marks in this menu: line up with the name */
+}
+
+.account-menu-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px 8px;
+}
+
+.account-menu-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-status {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.account-menu-head .account-status {
+  padding: 0;
+}
+
+.account-status.is-warning {
+  color: var(--accent-text);
+}
+
+.account-flash {
+  max-width: 260px;
+  font-size: 12.5px;
+  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-modes {
+  margin: 14px 0 4px;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.account-form .text-input {
+  flex: none;
+}
+
+.account-form .button-primary {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.account-form .notice {
+  margin: 0;
+}
+
+.account-ask {
+  margin: 12px 0 18px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Phones: no site name, the tabs fill the bar and scroll sideways inside it if they don't fit */
 @media (max-width: 820px) {
   .service-bar {
@@ -122,5 +260,15 @@
 
   .service-soon {
     display: none;
+  }
+
+  /* the picture only (the name is in the menu) */
+  .account-name,
+  .account-flash {
+    display: none;
+  }
+
+  .account-trigger {
+    padding: 0 4px;
   }
 }
