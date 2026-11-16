@@ -14,7 +14,8 @@ class Statement {
   bind(...params: unknown[]) {
     // Real D1 refuses more than 100 bound values in one query; act the same so tests catch it.
     if (params.length > 100) throw new Error(`D1 allows 100 bound parameters per query, got ${params.length}`);
-    return new Statement(this.db, this.sql, params);
+    // D1 takes ArrayBuffer for BLOBs; Node's SQLite wants a Uint8Array
+    return new Statement(this.db, this.sql, params.map((p) => (p instanceof ArrayBuffer ? new Uint8Array(p) : p)));
   }
   private args() {
     return this.params as never[];

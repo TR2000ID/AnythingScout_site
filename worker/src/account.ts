@@ -5,6 +5,9 @@
 //   POST   /api/account/signout (token)  → 204
 //   GET    /api/account/me      (token)  → {name, pictureAt, empty}
 //   POST   /api/account/sync    (token)  {rev, items, blocks} → {rev, items, blocks}   (sync.ts)
+//   PUT    /api/account/picture (token)  image bytes (webp/jpeg, ≤ 50 KB) → 204   415 wrong type · 413 too big
+//   DELETE /api/account/picture (token)  → 204
+//   GET    /api/account/picture/<name>   → the picture (public: anyone can see anyone's picture), 404 none
 // "(token)" = header Authorization: Bearer <token>. Without a valid one: 401 signed_out.
 import { HttpError, json, noContent } from "./http";
 import { normalizeName } from "./names";
@@ -161,6 +164,48 @@ async function syncRoute(request: Request, env: Env): Promise<Response> {
   return json(await sync(env, user, request));
 }
 
+// ---------- profile picture ----------
+
+export const PICTURE_MAX_BYTES = 50_000;
+const PICTURE_TYPES = ["image/webp", "image/jpeg"];
+
+async function putPicture(request: Request, env: Env): Promise<Response> {
+  const user = await requireUser(request, env);
+  const type = (request.headers.get("Content-Type") ?? "").split(";")[0].trim().toLowerCase();
+  if (!PICTURE_TYPES.includes(type)) throw new HttpError(415, "bad_type");
+  if (Number(request.headers.get("Content-Length") ?? 0) > PICTURE_MAX_BYTES) throw new HttpError(413, "too_big");
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength > PICTURE_MAX_BYTES) throw new HttpError(413, "too_big");
+  if (bytes.byteLength === 0) throw new HttpError(400, "empty");
+  await env.DB.prepare("UPDATE users SET picture = ?, picture_type = ?, picture_at = ? WHERE id = ?").bind(bytes, type, nowIso(), user.id).run();
+  return noContent();
+}
+
+async function deletePicture(request: Request, env: Env): Promise<Response> {
+  const user = await requireUser(request, env);
+  await env.DB.prepare("UPDATE users SET picture = NULL, picture_type = NULL, picture_at = NULL WHERE id = ?").bind(user.id).run();
+  return noContent();
+}
+
+async function getPicture(_request: Request, env: Env, path: string): Promise<Response> {
+  let name: string | null = null;
+  try {
+    name = normalizeName(decodeURIComponent(path.slice("/picture/".length)));
+  } catch {
+    // a broken %-encoding: no such picture
+  }
+  const row = name
+    ? await env.DB.prepare("SELECT picture, picture_type FROM users WHERE name = ? AND picture IS NOT NULL")
+        .bind(name)
+        .first<{ picture: ArrayLike<number>; picture_type: string }>()
+    : null;
+  if (!row) throw new HttpError(404, "not_found");
+  // D1 hands BLOBs back as a list of numbers (Node's SQLite as a Uint8Array): both become bytes here
+  return new Response(new Uint8Array(row.picture), {
+    headers: { "Content-Type": row.picture_type, "Cache-Control": "public, max-age=300", "X-Content-Type-Options": "nosniff" },
+  });
+}
+
 type Handler = (request: Request, env: Env, rest: string) => Promise<Response>;
 
 /** Address (after /api/account) → method → handler */
@@ -170,11 +215,12 @@ const ROUTES: Record<string, Partial<Record<string, Handler>>> = {
   "/signout": { POST: signout },
   "/me": { GET: me },
   "/sync": { POST: syncRoute },
+  "/picture": { PUT: putPicture, DELETE: deletePicture },
 };
 
 export async function handleAccount(request: Request, env: Env, url: URL): Promise<Response> {
   const path = url.pathname.slice("/api/account".length);
-  const methods = ROUTES[path];
+  const methods = path.startsWith("/picture/") ? { GET: getPicture } : ROUTES[path];
   try {
     if (!methods) throw new HttpError(404, "not_found");
     const handler = methods[request.method];
