@@ -12,7 +12,8 @@ export interface RatingRow {
 
 const KEY = "game-scout.ratings";
 
-function load(): Map<string, RatingRow> {
+/** What's saved right now (another tab may have changed it since this one loaded) */
+export function readSavedRatings(): Map<string, RatingRow> {
   const saved = loadSaved<{ version: 1; rows: RatingRow[] }>(KEY);
   return new Map((saved?.rows ?? []).map((row) => [row.game, upgrade(row)]));
 }
@@ -23,13 +24,13 @@ function upgrade(row: RatingRow): RatingRow {
   return (row.rating as string) === "hated" ? { ...row, rating: "disliked" } : row;
 }
 
-export const ratingsStore = createStore(load());
+export const ratingsStore = createStore(readSavedRatings());
 
 ratingsStore.subscribe(() => save(KEY, { version: 1, rows: [...ratingsStore.get().values()] }));
 
 // Another tab changed the ratings: pick them up here too
 window.addEventListener("storage", (event) => {
-  if (event.key === KEY) ratingsStore.set(load());
+  if (event.key === KEY) ratingsStore.set(readSavedRatings());
 });
 
 export function useRatings() {

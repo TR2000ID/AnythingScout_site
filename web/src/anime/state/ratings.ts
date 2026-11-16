@@ -18,19 +18,20 @@ const SAVED_TIERS: ReadonlySet<string> = new Set<Tier>(["loved", "liked", "okay"
 const isRow = (row: unknown): row is RatingRow =>
   typeof row === "object" && row !== null && typeof (row as RatingRow).show === "string" && SAVED_TIERS.has((row as RatingRow).rating);
 
-function load(): Map<string, RatingRow> {
+/** What's saved right now (another tab may have changed it since this one loaded) */
+export function readSavedRatings(): Map<string, RatingRow> {
   const saved = loadSaved<{ version?: number; rows?: unknown }>(KEY);
   const rows = Array.isArray(saved?.rows) ? saved.rows.filter(isRow) : []; // a broken save starts empty, not a blank page
   return new Map(rows.map((row) => [row.show, row]));
 }
 
-export const ratingsStore = createStore(load());
+export const ratingsStore = createStore(readSavedRatings());
 
 ratingsStore.subscribe(() => save(KEY, { version: 1, rows: [...ratingsStore.get().values()] }));
 
 // Another tab changed the ratings: pick them up here too
 window.addEventListener("storage", (event) => {
-  if (event.key === KEY) ratingsStore.set(load());
+  if (event.key === KEY) ratingsStore.set(readSavedRatings());
 });
 
 export function useRatings() {

@@ -35,19 +35,48 @@ export const DEFAULTS: Settings = {
   filters: { from: null, to: null, japanese: false, onSale: false },
 };
 
-const changed = loadSaved<Partial<Settings>>(KEY) ?? {};
-export const settingsStore = createStore<Settings>({
-  ...DEFAULTS,
-  ...changed,
-  filters: { ...DEFAULTS.filters, ...changed.filters },
-});
+/** Any saved value → full settings: the defaults plus the saved fields that make sense. Used on load, and for
+ *  settings an account brings from another device. */
+export function settingsFrom(saved: unknown): Settings {
+  if (!saved || typeof saved !== "object") return { ...DEFAULTS, filters: { ...DEFAULTS.filters } };
+  const raw = saved as Record<string, unknown>;
+  const oneOf = <T extends string>(value: unknown, options: T[]) => (options.includes(value as T) ? (value as T) : undefined);
+  const year = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+  const flag = (value: unknown) => (typeof value === "boolean" ? value : undefined);
+  const f = (typeof raw.filters === "object" && raw.filters ? raw.filters : {}) as Record<string, unknown>;
+  const out: Partial<Settings> = {
+    lang: oneOf(raw.lang, ["en", "ja"]),
+    titles: oneOf(raw.titles, ["en", "ja"]),
+    store: oneOf(raw.store, ["us", "jp"]),
+    platform: oneOf(raw.platform, ["steam", "playstation", "xbox", "switch"]),
+    mode: oneOf(raw.mode, ["players", "tags"]),
+  };
+  const changed: Partial<Settings> = Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined));
+  const filters = {
+    from: year(f.from),
+    to: year(f.to),
+    japanese: flag(f.japanese) ?? DEFAULTS.filters.japanese,
+    onSale: flag(f.onSale) ?? DEFAULTS.filters.onSale,
+  };
+  return { ...DEFAULTS, ...changed, filters };
+}
+
+/** What gets saved: only what differs from the defaults */
+export function savedForm(s: Settings): Partial<Settings> {
+  const diff: Partial<Settings> = {};
+  for (const key of Object.keys(DEFAULTS) as (keyof Settings)[])
+    if (JSON.stringify(s[key]) !== JSON.stringify(DEFAULTS[key])) Object.assign(diff, { [key]: s[key] });
+  return diff;
+}
+
+/** What's saved right now (another tab may have changed it since this one loaded) */
+export const readSavedSettings = () => settingsFrom(loadSaved<unknown>(KEY));
+
+export const settingsStore = createStore<Settings>(readSavedSettings());
 
 settingsStore.subscribe(() => {
   const now = settingsStore.get();
-  const diff: Partial<Settings> = {};
-  for (const key of Object.keys(DEFAULTS) as (keyof Settings)[])
-    if (JSON.stringify(now[key]) !== JSON.stringify(DEFAULTS[key])) Object.assign(diff, { [key]: now[key] });
-  save(KEY, diff);
+  save(KEY, savedForm(now));
   document.documentElement.lang = now.lang;
 });
 document.documentElement.lang = settingsStore.get().lang;

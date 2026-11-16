@@ -7,23 +7,10 @@ import { dataStore, type Catalog } from "../lib/data";
 import { cardRatings, fetchAniList, ImportError, readMalFile, type ListEntry } from "../lib/importList";
 import type { Tier } from "../lib/recommend";
 import { groupPicks, type Person } from "../lib/together";
-import { createStore, loadSaved, save, useStore } from "../state/createStore";
+import { useStore } from "../state/createStore";
+import { friendsStore } from "../state/friends";
 import { tiersOf, useRatings } from "../state/ratings";
 import { gemsPower, passes, useSettings, useTexts } from "../state/settings";
-
-interface Friend {
-  name: string;
-  ratings: Record<string, Tier>; // card key → rating
-}
-
-const KEY = "anime-scout.friends";
-/** Saved friends we can use: a name and an object of ratings (anything else in storage is skipped). */
-const isFriend = (f: unknown): f is Friend =>
-  typeof f === "object" && f !== null && typeof (f as Friend).name === "string" &&
-  typeof (f as Friend).ratings === "object" && (f as Friend).ratings !== null;
-const saved = loadSaved<unknown>(KEY);
-const friendsStore = createStore<Friend[]>(Array.isArray(saved) ? saved.filter(isFriend) : []);
-friendsStore.subscribe(() => save(KEY, friendsStore.get()));
 
 const PAGE_SIZE = 24;
 
