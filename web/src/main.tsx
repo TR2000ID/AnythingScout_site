@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { startSync } from "./shell/account/runner";
 import { installLinks, legacyRedirect, navigate } from "./shell/route";
 import { Shell } from "./shell/Shell";
 import "./anime/styles.css";
@@ -10,6 +11,7 @@ import "./shell/shell.css"; // after the section's styles: it moves their sticky
 const moved = legacyRedirect(location.pathname, location.hash, location.search);
 if (moved) navigate(moved, true);
 installLinks(); // links inside the site change the page without reloading it
+startSync(); // signed in: keep this browser's lists and the account in step (signed out: does nothing)
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

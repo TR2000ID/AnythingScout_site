@@ -29,6 +29,9 @@ export interface BlockSection {
   get(): string;
   /** Apply a saved block; a broken one is ignored */
   replace(value: string): void;
+  /** The text get() would give after replace(value). Defaults differ by device (a Japanese phone's language
+   *  default is ja), so another device's block can read differently here without anything having changed. */
+  normalize?(value: string): string;
   subscribe(fn: () => void): () => void;
 }
 
@@ -67,6 +70,10 @@ const animeSettingsBlock: BlockSection = {
     const p = parse(value);
     if (p.ok && p.value && typeof p.value === "object" && !Array.isArray(p.value)) animeSettings.settingsStore.set(animeSettings.settingsFrom(p.value));
   },
+  normalize: (value) => {
+    const p = parse(value);
+    return p.ok ? JSON.stringify(animeSettings.savedForm(animeSettings.settingsFrom(p.value))) : value;
+  },
   subscribe: (fn) => animeSettings.settingsStore.subscribe(fn),
 };
 
@@ -77,6 +84,10 @@ const gameSettingsBlock: BlockSection = {
     const p = parse(value);
     if (p.ok && p.value && typeof p.value === "object" && !Array.isArray(p.value)) gameSettings.settingsStore.set(gameSettings.settingsFrom(p.value));
   },
+  normalize: (value) => {
+    const p = parse(value);
+    return p.ok ? JSON.stringify(gameSettings.savedForm(gameSettings.settingsFrom(p.value))) : value;
+  },
   subscribe: (fn) => gameSettings.settingsStore.subscribe(fn),
 };
 
@@ -86,6 +97,10 @@ const friendsBlock: BlockSection = {
   replace: (value) => {
     const p = parse(value);
     if (p.ok && Array.isArray(p.value)) friendsStore.set(friendsFrom(p.value));
+  },
+  normalize: (value) => {
+    const p = parse(value);
+    return p.ok && Array.isArray(p.value) ? JSON.stringify(friendsFrom(p.value)) : value;
   },
   subscribe: (fn) => friendsStore.subscribe(fn),
 };

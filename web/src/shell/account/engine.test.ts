@@ -49,11 +49,28 @@ describe("planPush", () => {
 
   it("a changed block → sent, at its change time or now", () => {
     const s = snap({}, { "anime.settings": ["{}", T("10:00")] });
-    const p = planPush(s, local({}, { "anime.settings": '{"gems":1}', "anime.friends": "[]" }), {}, { "anime.settings": T("11:00") }, NOW);
+    const p = planPush(s, local({}, { "anime.settings": '{"gems":1}', "anime.friends": '[{"name":"M","ratings":{}}]' }), {}, { "anime.settings": T("11:00") }, NOW);
     expect(p.blocks).toEqual([
       { name: "anime.settings", value: '{"gems":1}', at: T("11:00") },
-      { name: "anime.friends", value: "[]", at: NOW },
+      { name: "anime.friends", value: '[{"name":"M","ratings":{}}]', at: NOW },
     ]);
+  });
+});
+
+describe("untouched blocks don't claim the account", () => {
+  // A phone that never changed its settings must not put "{}" into a new account: the PC signing in next would
+  // then find the account "has settings" and lose its own.
+  it("planPush skips a default block the account doesn't have yet", () => {
+    expect(planPush(emptySnapshot(), local({}, { "anime.settings": "{}", "anime.friends": "[]" }), {}, {}, NOW).blocks).toEqual([]);
+  });
+
+  it("… but sends going back to the defaults when the account has the block", () => {
+    const s = snap({}, { "anime.settings": ['{"gems":1}', T("10:00")] });
+    expect(planPush(s, local({}, { "anime.settings": "{}" }), {}, {}, NOW).blocks).toEqual([{ name: "anime.settings", value: "{}", at: NOW }]);
+  });
+
+  it("addChoice skips default blocks too", () => {
+    expect(addChoice(local({}, { "games.settings": "{}", "anime.friends": "[]" }), { items: [], blocks: [] }, NOW).blocks).toEqual([]);
   });
 });
 

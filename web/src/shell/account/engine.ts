@@ -23,6 +23,9 @@ export interface Changes {
 
 export const emptySnapshot = (): Snapshot => ({ rev: 0, items: {}, blocks: {} });
 
+/** A block nobody changed yet: settings left at their defaults, or no Watch together friends */
+export const isUntouched = (value: string) => value === "{}" || value === "[]";
+
 export const keyOf = (section: string, item: string) => `${section}|${item}`;
 
 function splitKey(key: string): { section: Section; item: string } {
@@ -41,8 +44,13 @@ export function planPush(snap: Snapshot, local: Local, removedAt: Record<string,
   for (const [key, was] of Object.entries(snap.items))
     if (was.rating !== null && !local.items.has(key)) items.push({ ...splitKey(key), rating: null, at: removedAt[key] ?? now });
   const blocks: SyncBlock[] = [];
-  for (const [name, value] of local.blocks)
-    if (snap.blocks[name]?.value !== value) blocks.push({ name: name as BlockName, value, at: blockAt[name] ?? now });
+  for (const [name, value] of local.blocks) {
+    const was = snap.blocks[name];
+    // An untouched block the account doesn't have stays home: otherwise it would count as "the account has
+    // settings" and replace another device's real ones when that device signs in
+    if (!was && isUntouched(value)) continue;
+    if (was?.value !== value) blocks.push({ name: name as BlockName, value, at: blockAt[name] ?? now });
+  }
   return { items, blocks };
 }
 
@@ -109,7 +117,7 @@ export function addChoice(local: Local, account: Changes, now: string): Changes 
   const items: SyncItem[] = [...local.items].map(([key, row]) => ({ ...splitKey(key), rating: row.rating, at: row.at }));
   const has = new Set(account.blocks.map((b) => b.name));
   const blocks: SyncBlock[] = [...local.blocks]
-    .filter(([name]) => !has.has(name as BlockName))
+    .filter(([name, value]) => !has.has(name as BlockName) && !isUntouched(value))
     .map(([name, value]) => ({ name: name as BlockName, value, at: now }));
   return { items, blocks };
 }
