@@ -23,3 +23,9 @@ export const readSavedFriends = () => friendsFrom(loadSaved<unknown>(KEY));
 
 export const friendsStore = createStore<Friend[]>(readSavedFriends());
 friendsStore.subscribe(() => save(KEY, friendsStore.get()));
+
+// Another tab changed them: pick that up here too (otherwise this tab would later save its older copy over it,
+// and with an account that older copy would reach every device)
+window.addEventListener("storage", (event) => {
+  if (event.key === KEY) friendsStore.set(readSavedFriends());
+});

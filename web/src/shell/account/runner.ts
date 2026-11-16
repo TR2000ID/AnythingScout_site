@@ -8,9 +8,11 @@ import type { Store } from "../../anime/state/createStore";
 import {
   ACCOUNT_KEY,
   accountStore,
+  readPending,
   readRecord,
   removeRecord,
   storageWorks,
+  writePending,
   writeRecord,
   type AccountRecord,
   type AccountState,
@@ -19,7 +21,7 @@ import {
 } from "./account";
 import { AccountError, realApi, type Api } from "./api";
 import { addChoice, applyPull, emptySnapshot, firstSignIn, keyOf, nextSnapshot, planPush, settle, type Changes, type Local, type Snapshot } from "./engine";
-import { BLOCK_SECTIONS, clearLocal, RATING_SECTIONS, restoreLocal, snapshotLocal, type BlockSection, type RatingSection } from "./sections";
+import { BLOCK_SECTIONS, clearLocal, RATING_SECTIONS, restoreLocal, snapshotLocal, type BlockSection, type LocalSnapshot, type RatingSection } from "./sections";
 import type { SyncAnswer } from "./types";
 
 export const DEBOUNCE_MS = 3000;
@@ -141,16 +143,25 @@ export function createRunner(deps: Deps): Runner {
     const now_ = section.get();
     const before = seenRatings.get(section.section) ?? new Map();
     seenRatings.set(section.section, now_);
-    if (applying) return;
-    const record = readRecord(storage);
-    if (!record?.token) return;
+    if (applying || !readRecord(storage)?.token) return;
+    const pending = readPending(storage);
     const at = now();
+    let changed = false;
     for (const item of before.keys()) {
       const key = keyOf(section.section, item);
-      if (!now_.has(item)) record.removedAt[key] ??= at; // another tab may have noted it first, with its own time
+      if (!now_.has(item) && !pending.removedAt[key]) {
+        pending.removedAt[key] = at; // another tab may have noted it first, with its own time: keep that one
+        changed = true;
+      }
     }
-    for (const item of now_.keys()) delete record.removedAt[keyOf(section.section, item)];
-    writeRecord(storage, record);
+    for (const item of now_.keys()) {
+      const key = keyOf(section.section, item);
+      if (pending.removedAt[key]) {
+        delete pending.removedAt[key];
+        changed = true;
+      }
+    }
+    if (changed) writePending(storage, pending);
     schedule();
   }
 
@@ -158,11 +169,10 @@ export function createRunner(deps: Deps): Runner {
     const value = block.get();
     const before = seenBlocks.get(block.name);
     seenBlocks.set(block.name, value);
-    if (applying || value === before) return;
-    const record = readRecord(storage);
-    if (!record?.token) return;
-    record.blockAt[block.name] = now();
-    writeRecord(storage, record);
+    if (applying || value === before || !readRecord(storage)?.token) return;
+    const pending = readPending(storage);
+    pending.blockAt[block.name] = now();
+    writePending(storage, pending);
     schedule();
   }
 
@@ -205,7 +215,8 @@ export function createRunner(deps: Deps): Runner {
       sent.blocks.push(...pendingBlocks);
       got.items.push(...answer.items);
       got.blocks.push(...answer.blocks);
-      snap = nextSnapshot(snap, answer, answer.rev);
+      // A rolled-back account answers with everything it holds: start the snapshot over from that
+      snap = nextSnapshot(answer.reset ? emptySnapshot() : snap, answer, answer.rev);
       pendingBlocks = [];
     }
     return { snap, got, sent, refused };
@@ -228,7 +239,8 @@ export function createRunner(deps: Deps): Runner {
     }
     const token = record.token;
     const local = readLocal();
-    const plan = planPush(forPlanning(record.snapshot), local, record.removedAt, record.blockAt, now());
+    const pending = readPending(storage);
+    const plan = planPush(forPlanning(record.snapshot), local, pending.removedAt, pending.blockAt, now());
     let result: Awaited<ReturnType<typeof pushParts>>;
     try {
       result = await pushParts(token, record.snapshot, plan);
@@ -244,9 +256,12 @@ export function createRunner(deps: Deps): Runner {
 
     const latest = readRecord(storage);
     if (!latest || latest.token !== token) return; // signed out meanwhile (in another tab): leave it be
-    for (const key of Object.keys(latest.removedAt)) if (!changed.has(key)) delete latest.removedAt[key];
-    for (const name of Object.keys(latest.blockAt)) if (!changed.has(name)) delete latest.blockAt[name];
     writeRecord(storage, { ...latest, snapshot: result.snap, synced: now() });
+    // What was noted before this sync has been sent; what changed while it ran goes next time
+    const left = readPending(storage);
+    for (const key of Object.keys(left.removedAt)) if (!changed.has(key)) delete left.removedAt[key];
+    for (const name of Object.keys(left.blockAt)) if (!changed.has(name)) delete left.blockAt[name];
+    writePending(storage, left);
     setStatus(result.refused ? "too_big" : "ok");
   }
 
@@ -258,25 +273,28 @@ export function createRunner(deps: Deps): Runner {
 
   // ---------- signing in and out ----------
 
-  async function finishAdd(session: { name: string; token: string }, account: Changes, stash: AccountRecord["stash"]) {
+  // In both: the sign-in (with this browser's set-aside lists) is saved BEFORE the lists change, so a closed tab,
+  // a slow network or a full storage can never leave the lists replaced with nothing saved to bring them back.
+
+  async function finishAdd(session: { name: string; token: string }, account: Changes, stash: LocalSnapshot) {
     const result = await pushParts(session.token, emptySnapshot(), addChoice(readLocal(), account, now()));
-    applyLocal(applyPull(readLocal(), settle(result.snap, result.sent, result.got), new Set()));
     await saveSignIn(session, result.snap, stash);
+    applyLocal(applyPull(readLocal(), settle(result.snap, result.sent, result.got), new Set()));
     setStatus(result.refused ? "too_big" : "ok");
   }
 
-  async function finishLeave(session: { name: string; token: string }, account: SyncAnswer, stash: AccountRecord["stash"]) {
-    const keep = stash ?? snapshotLocal(ratings, blocks); // this browser's own lists, back on sign-out
+  async function finishLeave(session: { name: string; token: string }, account: SyncAnswer, stash: LocalSnapshot) {
+    await saveSignIn(session, nextSnapshot(emptySnapshot(), account, account.rev), stash);
     const fresh: Local = { items: new Map(), blocks: new Map(blocks.map((b) => [b.name, b.name === "anime.friends" ? "[]" : "{}"])) };
     applyLocal(applyPull(fresh, account, new Set()));
-    await saveSignIn(session, nextSnapshot(emptySnapshot(), account, account.rev), keep);
     setStatus("ok");
   }
 
-  async function saveSignIn(session: { name: string; token: string }, snapshot: Snapshot, stash: AccountRecord["stash"]) {
+  async function saveSignIn(session: { name: string; token: string }, snapshot: Snapshot, stash: LocalSnapshot) {
     const me = await api.me(session.token).catch(() => null);
-    const record: AccountRecord = { name: session.name, token: session.token, pictureAt: me?.pictureAt ?? null, snapshot, removedAt: {}, blockAt: {}, stash, synced: now() };
+    const record: AccountRecord = { name: session.name, token: session.token, pictureAt: me?.pictureAt ?? null, snapshot, stash, synced: now() };
     if (!writeRecord(storage, record)) throw new AccountError("no_storage");
+    writePending(storage, { removedAt: {}, blockAt: {} });
   }
 
   async function signInFlow(name: string, mode: "create" | "signin"): Promise<SignInStep> {
@@ -285,7 +303,9 @@ export function createRunner(deps: Deps): Runner {
     await lock(async () => {
       const session = mode === "create" ? await api.createAccount(name) : await api.signIn(name);
       const account = await api.sync(session.token, { rev: 0, items: [], blocks: [] }); // look first, send nothing yet
-      const stash = readRecord(storage)?.stash ?? null; // a list set aside before ("You were signed out") stays set aside
+      // What this browser had before signing in comes back on sign-out, whichever way the sign-in goes (a list
+      // set aside by an earlier sign-in that ended with "You were signed out" stays the one to come back)
+      const stash = readRecord(storage)?.stash ?? snapshotLocal(ratings, blocks);
       const decision = firstSignIn(readLocal(), account);
       tooBig.clear();
       if (decision.kind !== "ask") await finishAdd(session, account, stash);
@@ -300,7 +320,8 @@ export function createRunner(deps: Deps): Runner {
   }
 
   function unsentCount(record: AccountRecord): number {
-    const p = planPush(forPlanning(record.snapshot), readLocal(), record.removedAt, record.blockAt, now());
+    const pending = readPending(storage);
+    const p = planPush(forPlanning(record.snapshot), readLocal(), pending.removedAt, pending.blockAt, now());
     return p.items.length + p.blocks.length;
   }
 

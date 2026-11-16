@@ -1,6 +1,6 @@
 // The five things an account carries, seen through one shape each (sections.ts). Groundwork: the site
 // behaves exactly as before; these only make the saved lists readable and writable from outside.   npm test
-import { fakeStorage } from "./test-env";
+import { fakeStorage, fireStorage } from "./test-env";
 import { beforeEach, describe, expect, it } from "vitest";
 
 const anime = await import("../../anime/state/settings");
@@ -64,6 +64,25 @@ describe("block sections", () => {
   it("get() reads the saved copy, so a tab whose memory is behind still reports what's saved", () => {
     fakeStorage.setItem("anime-scout.settings", JSON.stringify({ gems: 1 }));
     expect(JSON.parse(block("anime.settings").get())).toEqual({ gems: 1 });
+  });
+});
+
+describe("another tab's changes reach this tab's memory", () => {
+  // Otherwise a tab that's behind saves its old settings / Watch together list over the newer one, and with an
+  // account that old copy then wins on every device
+  it("settings", () => {
+    fakeStorage.setItem("anime-scout.settings", JSON.stringify({ gems: 1 }));
+    fireStorage("anime-scout.settings");
+    expect(anime.settingsStore.get().gems).toBe(1);
+    fakeStorage.setItem("game-scout.settings", JSON.stringify({ store: "jp" }));
+    fireStorage("game-scout.settings");
+    expect(games.settingsStore.get().store).toBe("jp");
+  });
+
+  it("Watch together friends", () => {
+    fakeStorage.setItem("anime-scout.friends", JSON.stringify([{ name: "Mika", ratings: {} }]));
+    fireStorage("anime-scout.friends");
+    expect(friendsStore.get()).toEqual([{ name: "Mika", ratings: {} }]);
   });
 });
 

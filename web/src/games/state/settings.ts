@@ -81,6 +81,12 @@ settingsStore.subscribe(() => {
 });
 document.documentElement.lang = settingsStore.get().lang;
 
+// Another tab changed them: pick that up here too (otherwise this tab would later save its older copy over it,
+// and with an account that older copy would reach every device)
+window.addEventListener("storage", (event) => {
+  if (event.key === KEY) settingsStore.set(readSavedSettings());
+});
+
 export function useSettings() {
   return useStore(settingsStore);
 }

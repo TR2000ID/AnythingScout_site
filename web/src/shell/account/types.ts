@@ -19,4 +19,5 @@ export interface SyncAnswer {
   rev: number;
   items: SyncItem[];
   blocks: SyncBlock[];
+  reset?: true; // the account was rolled back (D1 Time Travel): this is everything, start over from it
 }

@@ -3,7 +3,7 @@ import "./test-env"; // runner.ts brings in the real stores (for the real page):
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createStore } from "../../anime/state/createStore";
 import { AccountError, type Api } from "./api";
-import { ACCOUNT_KEY, type AccountState } from "./account";
+import { ACCOUNT_KEY, PENDING_KEY, type AccountState } from "./account";
 import { createRunner, type Deps, type Runner } from "./runner";
 import type { BlockSection, RatingSection, RatingValue } from "./sections";
 import type { Section, SyncAnswer, SyncBlock, SyncItem } from "./types";
@@ -59,17 +59,26 @@ function fakeServer() {
       for (const i of iw) u.items.set(`${i.section}|${i.item}`, { ...i, rev: u.rev });
       for (const b of bw) u.blocks.set(b.name, { ...b, rev: u.rev });
       const strip = <T extends { rev: number }>({ rev: _r, ...rest }: T) => rest;
+      const reset = body.rev > u.rev;
+      const since = reset ? 0 : body.rev;
       return {
         rev: u.rev,
-        items: [...u.items.values()].filter((i) => i.rev > body.rev).map(strip) as SyncItem[],
-        blocks: [...u.blocks.values()].filter((b) => b.rev > body.rev).map(strip) as SyncBlock[],
+        items: [...u.items.values()].filter((i) => i.rev > since).map(strip) as SyncItem[],
+        blocks: [...u.blocks.values()].filter((b) => b.rev > since).map(strip) as SyncBlock[],
+        ...(reset ? { reset: true as const } : {}),
       } satisfies SyncAnswer;
     },
     async putPicture() {},
     async deletePicture() {},
   };
   const held = (name: string) => users.get(name)!;
-  return { api, pushes, control, held };
+  /** D1 Time Travel: the account goes back to an earlier state (its rev goes down) */
+  const restore = (name: string, rev: number, keep: (key: string) => boolean) => {
+    const u = users.get(name)!;
+    u.rev = rev;
+    for (const key of [...u.items.keys()]) if (!keep(key)) u.items.delete(key);
+  };
+  return { api, pushes, control, held, restore };
 }
 
 // ---------- stand-in lists, shared like localStorage is between tabs ----------
@@ -147,6 +156,7 @@ function runnerFor(browser: Browser, server: Server, lock = makeLock()) {
 }
 
 const record = (b: Browser) => JSON.parse(b.storage.getItem(ACCOUNT_KEY) ?? "null");
+const pending = (b: Browser) => JSON.parse(b.storage.getItem(PENDING_KEY) ?? "null");
 const at = (hhmm: string) => `2026-11-15T${hhmm}:00.000Z`;
 
 let browser: Browser;
@@ -252,11 +262,11 @@ describe("syncing", () => {
     runner.start();
     await runner.idle();
     browser.rate("games", "steam:1", null);
-    const removedAt = record(browser).removedAt["games|steam:1"];
+    const removedAt = pending(browser).removedAt["games|steam:1"];
     expect(removedAt).toMatch(/^2026-11-15T12:/);
     await runner.syncNow();
     expect(server.held("Ken").items.get("games|steam:1")).toMatchObject({ rating: null, at: removedAt });
-    expect(record(browser).removedAt).toEqual({});
+    expect(pending(browser).removedAt).toEqual({});
   });
 
   it("another device's change arrives on the next sync", async () => {
@@ -373,5 +383,71 @@ describe("signing out with changes not yet sent", () => {
     expect(browser.storage.getItem(ACCOUNT_KEY)).toBeNull();
     expect(r.store.get()).toEqual({ state: "signed_out" });
     expect(browser.data.games.size).toBe(0);
+  });
+});
+
+describe("review fixes", () => {
+  it("Leave them out: if this browser can't save the sign-in, the friend's lists stay as they were", async () => {
+    await server.api.createAccount("Ken");
+    const { token } = await server.api.signIn("Ken");
+    await server.api.sync(token, { rev: 0, items: [{ section: "games", item: "steam:8", rating: "liked", at: at("09:00") }], blocks: [] });
+    for (const i of [1, 2, 3]) browser.rate("games", `steam:${i}`, "liked", at("10:00"));
+    const step = await runner.signInFlow("Ken", "signin");
+    if (step.kind !== "ask") throw new Error();
+    const setItem = browser.storage.setItem;
+    browser.storage.setItem = (k, v) => {
+      if (k === ACCOUNT_KEY) throw new Error("quota");
+      setItem(k, v);
+    };
+    await expect(step.resolve("leave")).rejects.toMatchObject({ code: "no_storage" });
+    expect([...browser.data.games.keys()].sort()).toEqual(["steam:1", "steam:2", "steam:3"]);
+    expect(r.store.get()).toEqual({ state: "signed_out" });
+  });
+
+  it("sign-out puts back what this browser had before signing in, on every path (not only Leave them out)", async () => {
+    for (const i of [1, 2, 3]) browser.rate("games", `steam:${i}`, "liked", at("10:00"));
+    browser.setBlock("anime.friends", '[{"name":"Mika","ratings":{}}]');
+    await runner.signInFlow("Ken", "create"); // a new account: uploads, nothing asked
+    browser.rate("games", "steam:4", "loved");
+    await runner.syncNow();
+    expect(await runner.signOutFlow()).toEqual({ kind: "done" });
+    expect([...browser.data.games.keys()].sort()).toEqual(["steam:1", "steam:2", "steam:3"]);
+    expect(browser.blockData["anime.friends"]).toBe('[{"name":"Mika","ratings":{}}]');
+    expect(server.held("Ken").items.size).toBe(4); // the account keeps everything
+  });
+
+  it("a change here never rewrites the sign-in record outside a sync, and writes nothing once signed out", async () => {
+    await runner.signInFlow("Ken", "create");
+    runner.start();
+    await runner.idle();
+    const written: string[] = [];
+    const setItem = browser.storage.setItem;
+    browser.storage.setItem = (k, v) => {
+      written.push(k);
+      setItem(k, v);
+    };
+    browser.rate("games", "steam:1", "liked");
+    browser.rate("games", "steam:1", null);
+    expect(written).not.toContain(ACCOUNT_KEY);
+    // another tab signed out a moment ago: this tab hears the lists change afterwards
+    browser.storage.removeItem(ACCOUNT_KEY);
+    for (const k of [...browser.memory.keys()]) if (k.startsWith(ACCOUNT_KEY)) browser.memory.delete(k);
+    written.length = 0;
+    browser.rate("games", "steam:2", "liked");
+    expect(written).toEqual([]);
+  });
+
+  it("after a Time Travel restore the device starts over from the account, and its own ratings go up again", async () => {
+    await runner.signInFlow("Ken", "create");
+    browser.rate("games", "steam:1", "liked", at("10:00"));
+    await runner.syncNow(); // rev 1
+    browser.rate("games", "steam:9", "liked", at("10:30"));
+    await runner.syncNow(); // rev 2
+    server.restore("Ken", 1, (key) => key === "games|steam:1");
+    await runner.syncNow(); // the account answers "reset": everything it holds
+    expect(record(browser).snapshot.rev).toBe(1);
+    await runner.syncNow();
+    expect([...server.held("Ken").items.keys()].sort()).toEqual(["games|steam:1", "games|steam:9"]);
+    expect([...browser.data.games.keys()].sort()).toEqual(["steam:1", "steam:9"]);
   });
 });

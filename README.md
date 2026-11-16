@@ -55,12 +55,15 @@ later as the empty `password_hash` column: nothing moves, nobody is signed out.
   into view, and when the browser is back online. Code: `worker/src/account.ts` + `sync.ts` (server),
   `web/src/shell/account/` (browser: `engine.ts` = the merge rules, `runner.ts` = when and how).
 - **First sign-in on a browser with ratings:** a new account takes them. An account that already has ratings asks
-  "Add them to your account / Leave them out" (Leave = this browser's lists are set aside and come back on
-  sign-out, for a friend's computer).
+  "Add them to your account / Leave them out" (Leave = the account's lists replace this browser's, nothing of
+  this browser's goes up: for a friend's computer).
+- **Sign out:** the browser goes back to what it had before you signed in on it (its own lists were set aside at
+  sign-in); the account keeps everything. Signing out on a friend's computer leaves nothing of yours there.
 - **Guessing limit:** 20 unknown names per address per 10 minutes, 10 creates per address per hour (429 after).
 - **Pictures:** cropped and shrunk to 128x128 in the browser, at most 50 KB, kept in D1.
-- **Free limits (D1 free plan):** 5 GB stored, 5 million rows read and 100,000 rows written per day. A few
-  friends use a tiny fraction; nothing here needs a card.
+- **Free limits (D1 free plan):** 5 GB stored, 5 million rows read and 100,000 rows written per day, 50 queries
+  per request (a sync uses about a dozen however many ratings it carries). A few friends use a tiny fraction;
+  nothing here needs a card.
 
 **The PC site uses its own test database** (wrangler's local D1 in `worker/.wrangler/`), never the live one:
 `npm run db:local` in `worker/` once (and after a new file in `worker/migrations/`). The live database is
@@ -72,7 +75,9 @@ later as the empty `password_hash` column: nothing moves, nobody is signed out.
 
 **Undo a bad sync or vandalism** (D1 Time Travel, free, the last 7 days): `npx wrangler d1 time-travel info
 anything-scout` shows the current point; `npx wrangler d1 time-travel restore anything-scout
---timestamp=<ISO time before the problem>` puts the whole database back to that moment.
+--timestamp=<ISO time before the problem>` puts the whole database back to that moment. Signed-in devices
+notice on their next sync (they've seen a later revision than the account now has), take everything the account
+holds again, and send back their own ratings that the restore took away.
 
 Design: `docs/superpowers/specs/2026-11-15-accounts-design.md`, plan: `docs/superpowers/plans/2026-11-15-accounts.md`.
 

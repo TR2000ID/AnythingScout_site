@@ -5,6 +5,9 @@ import { emptySnapshot, type Snapshot } from "./engine";
 import type { LocalSnapshot } from "./sections";
 
 export const ACCOUNT_KEY = "anything-scout.account";
+/** What changed here and hasn't been sent: kept apart from the record, so noting a change (which can happen in any
+ *  tab, outside the sync lock) never rewrites the token or the snapshot */
+export const PENDING_KEY = "anything-scout.account.pending";
 
 export type SyncStatus = "ok" | "offline" | "too_big";
 
@@ -19,9 +22,7 @@ export interface AccountRecord {
   token: string | null; // null after the server said the session is gone ("ended")
   pictureAt: string | null;
   snapshot: Snapshot; // the last state this browser and the account agreed on
-  removedAt: Record<string, string>; // "games|steam:730" → when it was removed here (not yet sent)
-  blockAt: Record<string, string>; // "anime.settings" → when it was changed here (not yet sent)
-  stash: LocalSnapshot | null; // this browser's own lists, set aside by "Leave them out"
+  stash: LocalSnapshot | null; // this browser's own lists from before signing in: back on sign-out
   synced: string | null; // when the last sync finished
 }
 
@@ -43,8 +44,6 @@ export function readRecord(storage: StorageLike): AccountRecord | null {
       token: r.token,
       pictureAt: typeof r.pictureAt === "string" ? r.pictureAt : null,
       snapshot: r.snapshot && typeof r.snapshot.rev === "number" ? r.snapshot : emptySnapshot(),
-      removedAt: r.removedAt ?? {},
-      blockAt: r.blockAt ?? {},
       stash: r.stash ?? null,
       synced: r.synced ?? null,
     };
@@ -66,8 +65,31 @@ export function writeRecord(storage: StorageLike, record: AccountRecord): boolea
 export function removeRecord(storage: StorageLike) {
   try {
     storage.removeItem(ACCOUNT_KEY);
+    storage.removeItem(PENDING_KEY);
   } catch {
     // blocked: nothing was saved anyway
+  }
+}
+
+export interface Pending {
+  removedAt: Record<string, string>; // "games|steam:730" → when it was removed here
+  blockAt: Record<string, string>; // "anime.settings" → when it was changed here
+}
+
+export function readPending(storage: StorageLike): Pending {
+  try {
+    const p = JSON.parse(storage.getItem(PENDING_KEY) ?? "null") as Partial<Pending> | null;
+    return { removedAt: p?.removedAt ?? {}, blockAt: p?.blockAt ?? {} };
+  } catch {
+    return { removedAt: {}, blockAt: {} };
+  }
+}
+
+export function writePending(storage: StorageLike, pending: Pending) {
+  try {
+    storage.setItem(PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    // full or blocked: a removal then goes up dated "now" instead (planPush), nothing is lost
   }
 }
 
