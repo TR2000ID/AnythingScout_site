@@ -30,7 +30,7 @@ Tests: `npm test` in `web/` and in `worker/`. Browser checks (need both servers 
 with Playwright: the global `python`, not Anime Scout's venv):
 `python tests\browser\shell_check.py <folder for screenshots>`
 (also `games_check`, `carry_check`, `site_check`, `import_check`, `together_check`, `watch_check`,
-`calendar_check`; `update_check` runs a real ~10-minute Steam update).
+`calendar_check`, `account_check`; `update_check` runs a real ~10-minute Steam update).
 
 ## Your Game Scout ratings (one-time copy)
 
@@ -39,6 +39,42 @@ Game Scout ran at `localhost:5181`, and browsers keep each address's saved data 
 changed) and prints a link per site: `/games/carry#<your ratings>`. Opening it writes them in exactly, and
 asks before replacing different ratings. `--open dev` / `--open live` opens the link; `--compare` checks it
 worked. Done 2026-11-15: 83 ratings from Firefox.
+
+## Accounts (optional)
+
+Sign in / Create account sits at the right end of the top bar. **Username only, no password** (your call,
+2026-11-15): anyone who knows a username can open that account, and the sign-in box says so. A password comes
+later as the empty `password_hash` column: nothing moves, nobody is signed out.
+
+- **What follows you:** Anime ratings, Anime settings, Watch together friends, Games ratings, Games settings
+  (hidden items count as ratings). Everything still lives in the browser first (same saved keys as before), so
+  the site works offline and signed out exactly as it always did.
+- **How it syncs:** each rating is its own row with its date; the newer date wins, and removing a rating is a
+  dated "removed" row, so it wins over an older rating on another device. Settings and the Watch together list
+  are saved whole; the newer one wins. A sync runs on page load, 3 seconds after a change, when the tab comes back
+  into view, and when the browser is back online. Code: `worker/src/account.ts` + `sync.ts` (server),
+  `web/src/shell/account/` (browser: `engine.ts` = the merge rules, `runner.ts` = when and how).
+- **First sign-in on a browser with ratings:** a new account takes them. An account that already has ratings asks
+  "Add them to your account / Leave them out" (Leave = this browser's lists are set aside and come back on
+  sign-out, for a friend's computer).
+- **Guessing limit:** 20 unknown names per address per 10 minutes, 10 creates per address per hour (429 after).
+- **Pictures:** cropped and shrunk to 128x128 in the browser, at most 50 KB, kept in D1.
+- **Free limits (D1 free plan):** 5 GB stored, 5 million rows read and 100,000 rows written per day. A few
+  friends use a tiny fraction; nothing here needs a card.
+
+**The PC site uses its own test database** (wrangler's local D1 in `worker/.wrangler/`), never the live one:
+`npm run db:local` in `worker/` once (and after a new file in `worker/migrations/`). The live database is
+`anything-scout` on Cloudflare.
+
+**Remove an account** (there's no Delete button while anyone could press it):
+`npx wrangler d1 execute anything-scout --remote --command "DELETE FROM users WHERE name='<exact name>'"` in
+`worker/`. Capitals count. Its ratings, settings and sign-ins go with it (the tables cascade).
+
+**Undo a bad sync or vandalism** (D1 Time Travel, free, the last 7 days): `npx wrangler d1 time-travel info
+anything-scout` shows the current point; `npx wrangler d1 time-travel restore anything-scout
+--timestamp=<ISO time before the problem>` puts the whole database back to that moment.
+
+Design: `docs/superpowers/specs/2026-11-15-accounts-design.md`, plan: `docs/superpowers/plans/2026-11-15-accounts.md`.
 
 ## Live site, and deploying
 
