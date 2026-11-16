@@ -5,6 +5,8 @@
 // on the phone beats an older rating on the PC). Same `at` on both sides: the server's copy stays.
 // Settings and the Watch together list: each saved whole as a block; the newer block wins.
 // Every change gets the account's next revision number, so "rows with rev > N" = what a device hasn't seen.
+// Writes and reads use one statement each however many rows (the rows go in as one JSON list): D1 on the free
+// plan allows 50 queries per request.
 import type { Env, User } from "./account";
 import { HttpError } from "./http";
 
@@ -28,6 +30,7 @@ export interface SyncAnswer {
   rev: number;
   items: SyncItem[];
   blocks: SyncBlock[];
+  reset?: true; // the account was rolled back: this is everything, start over from it
 }
 
 const SECTIONS: readonly string[] = ["anime", "games"];
@@ -37,7 +40,6 @@ const ITEM_KEY = /^[a-z0-9]+:[A-Za-z0-9_.-]{1,60}$/;
 export const MAX_ITEMS = 5000;
 export const MAX_BLOCK_CHARS = 1_000_000;
 export const MAX_BODY_CHARS = 4_000_000;
-const MAX_BOUND = 100; // D1 refuses more bound values than this in one statement
 
 /** Does the incoming row replace the existing one? Only when it's newer (ISO-8601 UTC compares as text). */
 export function mergeRow(existing: { at: string } | null, incoming: { at: string }): boolean {
@@ -54,12 +56,6 @@ function normalizeAt(raw: unknown): string {
   const at = new Date(ms).toISOString();
   if (!/^\d{4}-/.test(at)) throw bad("at must be a date"); // years past 9999 would break the text order
   return at;
-}
-
-function chunks<T>(list: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
-  return out;
 }
 
 /** Check the whole request before anything is written: a bad part refuses all of it */
@@ -108,25 +104,30 @@ export function readSyncBody(text: string): { rev: number; items: SyncItem[]; bl
   return { rev, items: [...itemsByKey.values()], blocks: [...blocksByName.values()] };
 }
 
-/** The `at` already saved for these rows (read in chunks of D1's limit) */
+/** The `at` already saved for these rows. One query however many rows: the keys go in as one JSON list
+ *  (json_each), because D1 on the free plan allows only 50 queries per request. */
 async function savedItemDates(env: Env, userId: number, items: SyncItem[]): Promise<Map<string, string>> {
   const saved = new Map<string, string>();
-  for (const section of SECTIONS) {
-    const keys = items.filter((i) => i.section === section).map((i) => i.item);
-    for (const part of chunks(keys, MAX_BOUND - 2)) {
-      const { results } = await env.DB.prepare(
-        `SELECT item, at FROM items WHERE user_id = ? AND section = ? AND item IN (${part.map(() => "?").join(",")})`,
-      )
-        .bind(userId, section, ...part)
-        .all<{ item: string; at: string }>();
-      for (const r of results) saved.set(`${section}|${r.item}`, r.at);
-    }
-  }
+  if (!items.length) return saved;
+  const keys = JSON.stringify(items.map((i) => ({ s: i.section, i: i.item })));
+  const { results } = await env.DB.prepare(
+    // CROSS JOIN keeps the list as the outer loop (SQLite's rule), so each key is one primary-key lookup
+    `SELECT t.section AS section, t.item AS item, t.at AS at FROM json_each(?2) AS j CROSS JOIN items AS t
+     WHERE t.user_id = ?1 AND t.section = json_extract(j.value, '$.s') AND t.item = json_extract(j.value, '$.i')`,
+  )
+    .bind(userId, keys)
+    .all<{ section: string; item: string; at: string }>();
+  for (const r of results) saved.set(`${r.section}|${r.item}`, r.at);
   return saved;
 }
 
 export async function sync(env: Env, user: User, request: Request): Promise<SyncAnswer> {
   const body = readSyncBody(await request.text());
+  // A device that has seen a later revision than the account has: the database was rolled back (D1 Time
+  // Travel). Answer with everything, marked reset, so the device starts over from what the account holds.
+  const current = await env.DB.prepare("SELECT rev FROM users WHERE id = ?").bind(user.id).first<{ rev: number }>();
+  const reset = body.rev > (current?.rev ?? 0);
+  const since = reset ? 0 : body.rev;
 
   // Which of the incoming rows win? (Only to know whether there's anything to write: the writes below check
   // the dates again themselves, so another device syncing at the same moment can't make an older row win.)
@@ -146,20 +147,17 @@ export async function sync(env: Env, user: User, request: Request): Promise<Sync
   const statements: D1PreparedStatement[] = [];
   if (itemWinners.length || blockWinners.length) {
     statements.push(env.DB.prepare("UPDATE users SET rev = rev + 1 WHERE id = ?").bind(user.id));
-    const ROW_VALUES = 4; // section, item, rating, at (+ ?1 = user, shared by every row)
-    for (const part of chunks(itemWinners, Math.floor((MAX_BOUND - 1) / ROW_VALUES))) {
-      const rows = part.map((_, i) => {
-        const n = 2 + i * ROW_VALUES;
-        return `(?1, ?${n}, ?${n + 1}, ?${n + 2}, ?${n + 3}, (SELECT rev FROM users WHERE id = ?1))`;
-      });
+    if (itemWinners.length)
       statements.push(
         env.DB.prepare(
-          `INSERT INTO items (user_id, section, item, rating, at, rev) VALUES ${rows.join(", ")}
+          `INSERT INTO items (user_id, section, item, rating, at, rev)
+           SELECT ?1, json_extract(j.value, '$.s'), json_extract(j.value, '$.i'), json_extract(j.value, '$.r'), json_extract(j.value, '$.a'),
+                  (SELECT rev FROM users WHERE id = ?1)
+           FROM json_each(?2) j WHERE true
            ON CONFLICT (user_id, section, item) DO UPDATE SET rating = excluded.rating, at = excluded.at, rev = excluded.rev
            WHERE excluded.at > items.at`,
-        ).bind(user.id, ...part.flatMap((r) => [r.section, r.item, r.rating, r.at])),
+        ).bind(user.id, JSON.stringify(itemWinners.map((r) => ({ s: r.section, i: r.item, r: r.rating, a: r.at })))),
       );
-    }
     for (const b of blockWinners)
       statements.push(
         env.DB.prepare(
@@ -170,8 +168,8 @@ export async function sync(env: Env, user: User, request: Request): Promise<Sync
       );
   }
   statements.push(
-    env.DB.prepare("SELECT section, item, rating, at FROM items WHERE user_id = ? AND rev > ? ORDER BY rev, section, item").bind(user.id, body.rev),
-    env.DB.prepare("SELECT name, value, at FROM blocks WHERE user_id = ? AND rev > ? ORDER BY name").bind(user.id, body.rev),
+    env.DB.prepare("SELECT section, item, rating, at FROM items WHERE user_id = ? AND rev > ? ORDER BY rev, section, item").bind(user.id, since),
+    env.DB.prepare("SELECT name, value, at FROM blocks WHERE user_id = ? AND rev > ? ORDER BY name").bind(user.id, since),
     env.DB.prepare("SELECT rev FROM users WHERE id = ?").bind(user.id),
   );
   const results = await env.DB.batch(statements);
@@ -180,5 +178,6 @@ export async function sync(env: Env, user: User, request: Request): Promise<Sync
     rev: (revRow[0] as { rev: number }).rev,
     items: items as SyncItem[],
     blocks: blocks as SyncBlock[],
+    ...(reset ? { reset: true } : {}),
   };
 }

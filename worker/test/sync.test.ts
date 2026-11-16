@@ -109,6 +109,26 @@ describe("sync", () => {
     expect(again.body.items.every((m: { rating: string }) => m.rating === "loved")).toBe(true);
   });
 
+  it("a 5,000-item sync stays far under D1's 50 queries per request (free plan)", async () => {
+    const many = Array.from({ length: 5000 }, (_, i) => item(`mal:${i + 1}`, "liked", T("10:00"), "anime"));
+    const before = env.DB.queries;
+    const r = await sync({ rev: 0, items: many, blocks: [{ name: "anime.settings", value: "{}", at: T("10:00") }] });
+    expect(r.status).toBe(200);
+    expect(rowCount("items")).toBe(5000);
+    expect(env.DB.queries - before).toBeLessThanOrEqual(15);
+    // the second pass reads 5,000 saved dates: still a handful of queries
+    const again = env.DB.queries;
+    await sync({ rev: 1, items: many.map((m) => ({ ...m, at: T("11:00") })), blocks: [] });
+    expect(env.DB.queries - again).toBeLessThanOrEqual(15);
+  });
+
+  it("a device ahead of the account (after a Time Travel restore) gets everything again, marked reset", async () => {
+    await sync({ rev: 0, items: [item("steam:730", "liked", T("10:00"))], blocks: [] });
+    const r = await sync({ rev: 80, items: [], blocks: [] });
+    expect(r.body).toEqual({ rev: 1, items: [item("steam:730", "liked", T("10:00"))], blocks: [], reset: true });
+    expect((await sync({ rev: 1, items: [], blocks: [] })).body.reset).toBeUndefined();
+  });
+
   it("5,001 items in one request → 400", async () => {
     const many = Array.from({ length: 5001 }, (_, i) => item(`mal:${i + 1}`, "liked", T("10:00"), "anime"));
     expect((await sync({ rev: 0, items: many, blocks: [] })).status).toBe(400);

@@ -5,6 +5,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+// Real D1 on the free plan allows 50 queries per Worker request (each statement in a batch counts): every query
+// run here is counted, so tests can check a route stays under it.
+const counter = { queries: 0 };
+
 class Statement {
   constructor(
     private db: DatabaseSync,
@@ -21,17 +25,21 @@ class Statement {
     return this.params as never[];
   }
   async first<T>(): Promise<T | null> {
+    counter.queries++;
     return (this.db.prepare(this.sql).get(...this.args()) as T) ?? null;
   }
   async all<T>(): Promise<{ results: T[] }> {
+    counter.queries++;
     return { results: this.db.prepare(this.sql).all(...this.args()) as T[] };
   }
   async run() {
+    counter.queries++;
     const r = this.db.prepare(this.sql).run(...this.args());
     return { meta: { changes: Number(r.changes) } };
   }
   /** Inside a batch: a SELECT (or RETURNING) gives its rows, like D1's batch results */
   runNow() {
+    counter.queries++;
     const stmt = this.db.prepare(this.sql);
     if (/^\s*SELECT\b/i.test(this.sql) || /\bRETURNING\b/i.test(this.sql)) return { results: stmt.all(...this.args()) };
     stmt.run(...this.args());
@@ -59,5 +67,9 @@ export function fakeD1() {
       }
     },
     raw: db,
+    /** Queries run so far (all fake databases share the count: read it before and after) */
+    get queries() {
+      return counter.queries;
+    },
   };
 }
