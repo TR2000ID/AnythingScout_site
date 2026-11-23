@@ -294,6 +294,21 @@ describe("syncing", () => {
     expect(server.pushes).toHaveLength(0);
   });
 
+  it("the server refuses or has a problem → status problem (not offline); the next trigger tries again", async () => {
+    await runner.signInFlow("Ken", "create");
+    runner.start();
+    await runner.idle();
+    server.control.fail = new AccountError("server"); // a 400 bad_sync or a 500: the connection is fine
+    browser.rate("games", "steam:1", "liked");
+    await runner.syncNow();
+    expect(r.store.get()).toMatchObject({ status: "problem" });
+    server.control.fail = null;
+    r.fire("visible");
+    await vi.waitFor(() => expect(server.held("Ken").items.size).toBe(1));
+    await runner.idle();
+    expect(r.store.get()).toMatchObject({ status: "ok" });
+  });
+
   it("offline → status offline; the next online event syncs", async () => {
     await runner.signInFlow("Ken", "create");
     runner.start();

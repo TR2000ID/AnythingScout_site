@@ -247,7 +247,9 @@ export function createRunner(deps: Deps): Runner {
     } catch (err) {
       const code = err instanceof AccountError ? err.code : "server";
       if (code === "signed_out") endSession();
-      else setStatus("offline"); // no connection, or the server had a problem: try again on the next trigger
+      // No connection, or the server refused / had a problem (said as such, not as "offline"): either way,
+      // try again on the next trigger
+      else setStatus(code === "offline" ? "offline" : "problem");
       return;
     }
     const nowLocal = readLocal();

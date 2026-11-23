@@ -26,6 +26,7 @@ export function ago(iso: string, t: Texts, now = Date.now()): string {
 
 function statusLine(account: Extract<AccountState, { state: "signed_in" }>, t: Texts): string {
   if (account.status === "offline") return t.offline;
+  if (account.status === "problem") return t.syncProblem;
   if (account.status === "too_big") return t.tooBig;
   return account.synced ? t.synced(ago(account.synced, t)) : t.notSynced;
 }

@@ -9,7 +9,8 @@ export const ACCOUNT_KEY = "anything-scout.account";
  *  tab, outside the sync lock) never rewrites the token or the snapshot */
 export const PENDING_KEY = "anything-scout.account.pending";
 
-export type SyncStatus = "ok" | "offline" | "too_big";
+// offline = no connection; problem = connected, but the server refused the sync or had an error
+export type SyncStatus = "ok" | "offline" | "problem" | "too_big";
 
 export type AccountState =
   | { state: "signed_out" }

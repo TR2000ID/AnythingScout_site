@@ -32,6 +32,7 @@ interface AccountTexts {
   synced: (ago: string) => string;
   notSynced: string;
   offline: string;
+  syncProblem: string;
   tooBig: string;
   unsynced: (n: number) => string;
   signOutAnyway: string;
@@ -81,6 +82,7 @@ export const SHELL_TEXTS: Record<"en" | "ja", ShellTexts> = {
       synced: (ago) => `Synced ${ago}`,
       notSynced: "Not synced yet",
       offline: "Offline: changes will sync later",
+      syncProblem: "Couldn't sync: the site had a problem. It will try again.",
       tooBig: "Watch together list is too big to sync",
       unsynced: (n) => `${n} ${n === 1 ? "change hasn't" : "changes haven't"} synced yet. Sign out anyway?`,
       signOutAnyway: "Sign out anyway",
@@ -129,6 +131,7 @@ export const SHELL_TEXTS: Record<"en" | "ja", ShellTexts> = {
       synced: (ago) => `同期：${ago}`,
       notSynced: "まだ同期していません",
       offline: "オフライン：変更はあとで同期されます",
+      syncProblem: "同期できませんでした（サイト側の問題）。あとでもう一度試します。",
       tooBig: "「みんなで観る」のリストが大きすぎて同期できません",
       unsynced: (n) => `${n}件の変更がまだ同期されていません。ログアウトしますか？`,
       signOutAnyway: "ログアウトする",
