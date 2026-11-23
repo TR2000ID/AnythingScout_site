@@ -1,6 +1,6 @@
 # Daily Steam update, online — design (short)
 
-Date: 2026-11-23. Status: draft, waiting for the owner's OK.
+Date: 2026-11-23. Status: approved 2026-11-23 ("Do what you can"); updated after the code review.
 
 ## Why
 
@@ -35,17 +35,18 @@ its own project (Claude's call, stated to the owner).
 ## Design
 
 - **Where:** a new workflow `.github/workflows/daily-steam.yml` in **AnythingScout_site** (the repo that owns
-  the live site). Triggers: `schedule` cron `0 19 * * *` (= 04:00 JST) + `workflow_dispatch` (a manual
+  the live site). Triggers: `schedule` cron `17 19 * * *` (= 04:17 JST; GitHub delays top-of-hour runs) + `workflow_dispatch` (a manual
   "Run workflow" button = the online "Update now").
-- **Steps:** check out AnythingScout_site at the **`live` tag** → check out **Game_Scout** `main` next to it
-  (read-only) → Python 3.14 + `numpy requests` → `python update_steam.py` with `ANYTHING_SCOUT_DATA` pointing at
-  the live checkout's `web/public/data/games` → `npm ci` in web/ and worker/ → `npm run deploy:golive` in
-  worker/ using the Cloudflare secrets.
+- **Steps:** check out AnythingScout_site at the **`live` tag** → check out **Game_Scout** at its own **`live` tag** next to it
+  (read-only; review ruling: unfinished update code on Game Scout's main must not run here) → Python 3.14 + `numpy requests` → `python update_steam.py` with `ANYTHING_SCOUT_DATA` pointing at
+  the live checkout's `web/public/data/games` → `npm ci` in web/ and worker/ → build web/ (no token) →
+  `npx wrangler deploy` in worker/ (only this step gets the Cloudflare token; both checkouts use
+  `persist-credentials: false`).
 - Because the update builds on the `live` tag's own base files, the base-mismatch problem `deploy_live.py`
   guards against can't happen here.
 - **Secrets (the owner adds them on github.com; they never go through the chat):**
   - `CLOUDFLARE_API_TOKEN` (template "Edit Cloudflare Workers"; D1 permission added only if the deploy asks
-    for it) + `CLOUDFLARE_ACCOUNT_ID`.
+    for it). The account ID is not a credential: plain env in the workflow.
   - `GAME_SCOUT_DEPLOY_KEY`: a read-only **deploy key** on Game_Scout (Claude's call over a personal token:
     it covers one repo, can only read, and never expires). Claude makes the key pair on the PC. The owner
     pastes the public half into Game_Scout → Deploy keys and the private half into the secret.

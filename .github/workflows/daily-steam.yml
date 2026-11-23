@@ -43,13 +43,18 @@ jobs:
         with:
           ref: live
           path: anything-scout
+          persist-credentials: false  # no later step needs git, so no login is left lying around
 
-      - name: Game Scout's code (read-only deploy key)
+      # Game Scout's own `live` tag too, so unfinished update code on its main never runs here.
+      # Changed update_steam.py? Move the tag: git tag -f live && git push -f origin live (in game-scout)
+      - name: Game Scout's code at its live tag (read-only deploy key)
         uses: actions/checkout@v5
         with:
           repository: TR2000ID/Game_Scout
+          ref: live
           ssh-key: ${{ secrets.GAME_SCOUT_DEPLOY_KEY }}
           path: game-scout
+          persist-credentials: false
 
       - uses: actions/setup-python@v6
         with:
@@ -77,8 +82,13 @@ jobs:
           npm ci --prefix anything-scout/web
           npm ci --prefix anything-scout/worker
 
-      - name: Build + deploy to Cloudflare
+      # The same two halves as `npm run deploy:golive`, split so the Cloudflare key is only handed to
+      # wrangler, never to the site's build tools
+      - name: Build the site
+        run: npm --prefix anything-scout/web run build
+
+      - name: Deploy to Cloudflare
         working-directory: anything-scout/worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npm run deploy:golive
+        run: npx wrangler deploy
