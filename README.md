@@ -8,7 +8,7 @@ The data work stays in its own repos, which write into this one:
 - **Anime:** Anime Scout's `export_web.py` → `web/public/data/anime/`
 - **Games:** Game Scout's `export_web.py`, `import_steam.py` and `update_steam.py` → `web/public/data/games/`
   (`site_files.py` there; the repos sit side by side in `C:\Users\PC_User\Projects`). The daily Steam
-  update (Windows task, 04:00) writes dated files + `steam/latest.json`, which git ignores; git keeps a
+  update (online, see "Fresh Steam prices every morning" below) writes dated files + `steam/latest.json`, which git ignores; git keeps a
   plain-named starting copy.
 
 ## Run it on your PC
@@ -96,13 +96,15 @@ Check the live site: set `SITE=https://anime-scout.nomikai-scout-worker.workers.
 
 ### Fresh Steam prices every morning
 
-`python tools\deploy_live.py` puts the latest Steam update on the live site: it rebuilds the version tagged
-`live` (in a second copy of the repo, `..\anything-scout-live`) with today's Steam files and deploys it, so
-unfinished work never goes out. Nothing new → it does nothing. `--dry-run` shows the steps; `--log` writes to
-`.deploy_live\deploy.log`.
+GitHub does it, with the PC off: `.github/workflows/daily-steam.yml` runs every day at 04:17 Japan time.
+It takes this repo at the `live` tag plus Game Scout's code, runs `update_steam.py`, then
+`npm run deploy:golive`. "Run workflow" on the repo's Actions tab runs it by hand. It needs the secrets
+`GAME_SCOUT_DEPLOY_KEY` (read-only deploy key on Game_Scout) and `CLOUDFLARE_API_TOKEN`. A failed update
+deploys nothing, and GitHub emails about it. Design: `docs/superpowers/specs/2026-11-23-daily-update-online-design.md`.
 
-It's meant to run right after Game Scout's 04:00 update, as a second action of the Windows task
-"Game Scout - daily Steam update" (`pythonw.exe tools\deploy_live.py --log`, starting in this folder).
-To stop it: Task Scheduler → that task → Actions → delete that line.
+By hand from the PC (fallback): `python tools\deploy_live.py` puts the PC's latest Steam update on the live
+site. It rebuilds the version tagged `live` (in a second copy of the repo, `..\anything-scout-live`) with the
+PC's Steam files and deploys it, so unfinished work never goes out. Nothing new → it does nothing.
+`--dry-run` shows the steps; `--log` writes to `.deploy_live\deploy.log`.
 
 Design: `docs/superpowers/specs/2026-11-15-merge-design.md`.

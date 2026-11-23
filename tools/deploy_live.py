@@ -1,17 +1,18 @@
-"""Puts today's Steam prices on the live site, every morning after Game Scout's 04:00 update.
+"""Puts the PC's latest Steam update on the live site, by hand.
+
+The daily run is online now: .github/workflows/daily-steam.yml does the same on GitHub, with the PC off.
+This script is the fallback from the PC (GitHub down, or a quick redeploy of the PC's data).
 
     python tools/deploy_live.py            build + deploy (about a minute)
     python tools/deploy_live.py --dry-run  only say what it would do
-    python tools/deploy_live.py --log      for the Windows task: writes to .deploy_live/deploy.log instead
+    python tools/deploy_live.py --log      writes to .deploy_live/deploy.log instead of the screen
 
 It deploys the version you approved (the git tag `live`), never whatever is on main: unfinished work stays on
 your PC. It keeps a second copy of the repo at that tag next to this one (../anything-scout-live), copies in
 today's Steam files (they aren't in git), and runs the same command you'd run by hand: `npm run deploy:golive`.
 If nothing changed since the last deploy (same `live` version, same Steam update) it does nothing.
 
-Runs as the second step of the Windows task "Game Scout - daily Steam update". To stop the daily deploys, remove
-that step: Task Scheduler → the task → Actions → delete the deploy_live.py line. A failed run leaves the site
-as it was (yesterday's prices).
+A failed run leaves the site as it was (yesterday's prices).
 """
 import hashlib
 import json
